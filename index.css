@@ -1,0 +1,162 @@
+@font-face {
+        font-family: 'Wallpoet';
+        src: url('https://fonts.gstatic.com/s/wallpoet/v16/f0X10em2_8RnXVVdUObp58Q.woff2')
+          format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      .wallpoet-regular {
+        font-family: 'Wallpoet', sans-serif;
+        font-weight: 400;
+        font-style: normal;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        /* Removed filter: blur(0.4px); as it was affecting canvas visibility */
+      }
+      #shadow {
+        box-shadow: 0 0 10vw 20vw rgba(0, 0, 0, 1) inset;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      /* Blinking animation - shadow switches between inset and outset with dramatic intensity changes */
+      @keyframes blinkShadow {
+        0% { box-shadow: 0 0 10vw 20vw rgba(0, 0, 0, 1) inset; }
+        40% { box-shadow: 0 0 20vw 30vw rgba(0, 0, 0, 0.9) outset; }
+        60% { box-shadow: 0 0 25vw 35vw rgba(0, 0, 0, 0.8) outset; }
+        80% { box-shadow: 0 0 30vw 40vw rgba(0, 0, 0, 0.7) outset; }
+        100% { box-shadow: 0 0 35vw 45vw rgba(0, 0, 0, 0.6) outset; }
+      }
+      
+      /* Add this class to #shadow when eyes are closed */
+      .eyes-closed {
+        animation: blinkShadow 0.8s alternate infinite ease-in-out;
+        transition: box-shadow 0.1s ease; /* Faster transition */
+      }
+      #cesiumContainer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        z-index: 0;
+      }
+      #controls {
+        position: fixed;
+        top: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 11;
+        background: radial-gradient(
+          circle at center,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0) 70%
+        );
+        transition: all 0.5s ease;
+      }
+      #controls::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0;
+        transition: opacity 0.5s cubic-bezier(.4, 0, .2, 1);
+        background: radial-gradient(
+          circle at center,
+          rgba(255, 255, 255, 0.2) 0%,
+          rgba(255, 255, 255, 0) 70%
+        );
+      }
+      #controls:has(#playBtn:hover)::before {
+        opacity: 1;
+      }
+      #background {
+        position: fixed;
+        width: 100vw;
+        height: 100vh;
+        /* clip-path: inset(10px 20px 30px 40px); */
+        z-index: 1;
+        pointer-events: none;
+      }
+      .frame {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6); /* Semi-transparent overlay */
+        box-shadow: inset 0 0 0 20px black; /* Create the black border around the hole */
+      }
+
+      .frame::before {
+        content: '';
+        position: absolute;
+        top: 50px; /* Adjust top position of the hole */
+        left: 50px; /* Adjust left position of the hole */
+        right: 50px; /* Adjust right position of the hole */
+        bottom: 50px; /* Adjust bottom position of the hole */
+        background: transparent; /* Transparent hole */
+      }
+      #playBtn, #pauseBtn {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        font-size: 20px;
+        color: white;
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+        z-index: 12;
+        width: 50vw;
+        height: 30vh;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+      }
+
+#video {
+  opacity: 0.2;
+}
+
+#loading {
+  background: red;
+}
+
+button {
+  padding: 0.5rem;
+  font-family: 'Wallpoet', sans-serif;
+  font-size: 1rem;
+  color: white;
+  border: 1px solid rgba(0,0,0,1);
+  background: rgba(0, 0, 0, 1);
+}
+
+button:hover {
+  background: rgba(52, 52, 52, 0);
+  border: 1px solid rgba(0,255,0,1);
+  cursor: pointer;
+}

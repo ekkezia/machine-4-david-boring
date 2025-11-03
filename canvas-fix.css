@@ -1,0 +1,44 @@
+/* Canvas fix styles */
+#canvas {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 10000 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: screen !important; /* Changed to screen for better blending */
+  pointer-events: none !important;
+  transform: scaleX(-1) !important; /* Flip horizontally to match video */
+}
+
+/* Override any body filter that might affect the canvas */
+body #canvas {
+  filter: none !important;
+}
+
+/* Video element styling - hidden but still used for detection */
+#video {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: scaleX(-1) !important; /* Flip horizontally */
+}
+
+/* Ripple effect containers */
+#eye-circles,
+#keypoint-ripples-container {
+  mix-blend-mode: screen !important;
+  opacity: 0.5 !important; 
+  filter: blur(5px) !important;
+  /* Remove container flip to prevent double-flipping */
+}
+
+/* We need to account for the fact that the coordinates are already flipped in calculation */
+.keypoint-ripple {
+  mix-blend-mode: screen !important;
+  transform: scaleX(-1) !important; /* Apply flip at the individual element level */
+}
+
+/* White center for ripple circles */
+.ripple-circle {
+  background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 70%) !important;
+}
