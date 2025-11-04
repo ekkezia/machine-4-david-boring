@@ -7,10 +7,12 @@
     <link rel="stylesheet" href="/index.css" />
     <style>
       body {
-        font-family: system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial;
+        font-family: monospace;
         background: #111;
         color: #eee;
-        padding: 18px;
+        width: 100vw;
+        height: 100dvh;
+        max-width: 100vw;
       }
       #remote-status {
         margin-top: 10px;
@@ -19,33 +21,31 @@
     </style>
   </head>
   <body>
-    <div
-      id="remote-card"
-      style="
-        max-width: 520px;
-        margin: 20px auto;
-        padding: 18px;
-        border-radius: 12px;
-        background: rgba(0, 0, 0, 0.7);
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
-      "
-    >
-      <h1 class="wallpoet-regular" style="margin: 0 0 8px 0; font-size: 1.6rem">
-        Gyro Remote
-      </h1>
-
-    </div>
-    </div>
+    <h1 class="wallpoet-regular" style="margin: 0 0 0 0; font-size: 1.6rem">
+      MATTER
+    </h1>
 
     <!-- Appended guest UI from /remote/index.js (visual room boxes + guest button) -->
-    <div id="guest-panel" style="max-width:520px;margin:12px auto;padding:12px;border-radius:10px;background:rgba(255,255,255,0.03);">
-      <p class="wallpoet-regular" style="margin:0 0 8px 0">Enter the room code and connect to stream gyroscope data from your mobile device to [DAVIDBORING][MATTER]</p>
-      <div id="room-input-container" style="display:flex;gap:6px;margin-bottom:6px"></div>
-        <input id="gc-room" type="hidden" />
-      <p style="margin:6px 0 8px 0;font-size:0.9rem;color:#ccc">Don't have a room code?<br />Go to <a href="https://davidboring.github.io/gyro-client/" target="_blank">Gyro Client</a> on Desktop</p>
+    <div id="guest-panel">
+      <p class="wallpoet-regular" style="margin: 0 0 8px 0">
+        Enter the room code and connect to stream gyroscope data from your
+        mobile device to [DAVIDBORING][MATTER]
+      </p>
+      <div
+        id="room-input-container"
+        style="display: flex; gap: 6px; margin-bottom: 6px"
+      ></div>
+      <input id="gc-room" type="hidden" />
+      <p style="margin: 6px 0 8px 0; font-size: 0.9rem; color: #ccc">
+        Don't have a room code?<br />Go to
+        <a href="https://davidboring.github.io/gyro-client/" target="_blank"
+          >Gyro Client</a
+        >
+        on Desktop
+      </p>
     </div>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="./index.js" type="module"></script>
   </body>
 </html>

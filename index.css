@@ -20,7 +20,7 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        /* Removed filter: blur(0.4px); as it was affecting canvas visibility */
+        filter: blur(0.4px);
       }
       #shadow {
         box-shadow: 0 0 10vw 20vw rgba(0, 0, 0, 1) inset;
@@ -32,7 +32,10 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        z-index: 1;
+        pointer-events: none;
+        z-index: 9999;
+        transition: 'background 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s cubic-bezier(.4,0,.2,1)';
+
       }
 
       /* Blinking animation - shadow switches between inset and outset with dramatic intensity changes */

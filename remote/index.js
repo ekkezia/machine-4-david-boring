@@ -1,7 +1,16 @@
+import { defaultServer } from '../config';
+import { isMobile } from '../utils';
+
 (function () {
-  let gyro = null;
+  alert('a');
+  // redirect to /  if on desktop device
+  // if (!isMobile) {
+  //   const currentUrl = new URL(window.location.href);
+  //   currentUrl.pathname = '/';
+  //   window.location.href = currentUrl.href;
+  // }
+
   let status = null;
-  const defaultServer = `https://714870b841be.ngrok-free.app`;
 
   const enterBtn = document.createElement('button');
   enterBtn.textContent = status ?? 'Enter';
@@ -203,5 +212,18 @@
     if (!socket) socket = io(defaultServer);
 
     socket.emit('join-room', code, 'remote');
+  });
+
+  const gyroBtn = document.createElement('button');
+  gyroBtn.textContent = 'Enable Gyro';
+  gyroBtn.style.position = 'fixed';
+  gyroBtn.style.top = '10px';
+  gyroBtn.style.left = '10px';
+  gyroBtn.style.zIndex = 9999;
+  document.body.appendChild(gyroBtn);
+
+  gyroBtn.addEventListener('click', async () => {
+    await enableCompass();
+    gyroBtn.style.display = 'none'; // hide after enabling
   });
 })();

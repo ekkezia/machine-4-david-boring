@@ -1,4 +1,8 @@
 // Map & Audio, Cesium
+
+import { defaultServer } from './config.js';
+import { isMobile } from './utils.js';
+
 // --- Cesium Standalone Logic ---
 let viewer, movingPoint;
 let audioCtx, source, analyser, timeDomainData, audioBuffer;
@@ -12,7 +16,127 @@ const gyro = { alpha: null, beta: null, gamma: null };
 let cameraHeading = 0; // store current camera rotation in radians - correlated with gyro's rotation
 
 let socket = null;
-const defaultServer = `${location.protocol}//${location.hostname}:3000`;
+
+// Loading States
+let audioReady = false;
+let mapReady = false;
+
+// Modes
+let hasSelectedMode = true;
+let isGuest = false;
+
+// UI Elements
+// GYRO INFO UI
+const gyroInfoUI = document.createElement('div');
+gyroInfoUI.id = 'gyro-info-ui';
+gyroInfoUI.style.position = 'fixed';
+gyroInfoUI.style.left = '10px';
+gyroInfoUI.style.top = '10px';
+gyroInfoUI.style.zIndex = 30000;
+gyroInfoUI.style.color = 'white';
+gyroInfoUI.innerText = '00.00';
+document.body.appendChild(gyroInfoUI);
+
+const deltaInfoUI = document.createElement('div');
+deltaInfoUI.id = 'delta-info-ui';
+deltaInfoUI.style.position = 'fixed';
+deltaInfoUI.style.right = '10px';
+deltaInfoUI.style.top = '10px';
+deltaInfoUI.style.zIndex = 30000;
+deltaInfoUI.style.color = 'white';
+deltaInfoUI.innerText = '00.00';
+document.body.appendChild(deltaInfoUI);
+
+const idUI = document.createElement('div');
+idUI.id = 'id-ui';
+idUI.style.position = 'fixed';
+idUI.style.bottom = '10px';
+idUI.style.right = '10px';
+idUI.style.zIndex = 30000;
+idUI.style.color = 'white';
+idUI.innerText = '000000000000';
+document.body.appendChild(idUI);
+
+// Create a small overlay UI
+const ui = document.createElement('div');
+ui.id = 'room-code-panel';
+ui.style.position = 'fixed';
+ui.style.width = '100vw';
+ui.style.height = '100dvh';
+ui.style.display = 'flex';
+ui.style.flexDirection = 'column';
+ui.style.justifyContent = 'center';
+ui.style.alignItems = 'center';
+ui.style.zIndex = 99;
+ui.style.background = 'rgba(0,0,0,0.)';
+ui.style.color = 'white';
+ui.style.fontSize = '16px';
+ui.style.pointerEvents = 'auto'; // panel itself is interactive
+ui.style.opacity = 1;
+ui.style.backdropFilter = 'blur(16px)';
+ui.style.textAlign = 'center';
+ui.style.transition =
+  'backdrop-filter 0.7s cubic-bezier(.4,0,.2,1), background 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s cubic-bezier(.4,0,.2,1)';
+ui.innerHTML = `
+    <p style="width:400px;">Enter the room code on your mobile device to use it as remote control</p>
+
+    <div id="room-input-container" style="display:flex;gap:6px;margin-bottom:6px"></div>
+    <input id="gc-room" type="hidden" />
+    <p>Don't have a mobile device?<br/ ></p>
+    <div style="display:flex;gap:6px;margin-bottom:6px"><button id="gc-connect">Guest</button></div>
+  `;
+// <div id='gc-status' style='margin-top:6px;font-size:12px;opacity:0.9'>
+//   Disconnected
+// </div>;
+
+document.body.appendChild(ui);
+
+// create visible digit spans
+const roomInputContainerEl = document.getElementById('room-input-container');
+if (roomInputContainerEl && roomInputContainerEl.children.length === 0) {
+  for (let i = 0; i < 4; i++) {
+    const s = document.createElement('span');
+    s.style.width = '40px';
+    s.style.height = '60px';
+    s.style.background = '#ccc';
+    s.style.borderRadius = '8px';
+    s.style.display = 'inline-flex';
+    s.style.alignItems = 'center';
+    s.style.justifyContent = 'center';
+    s.style.fontSize = '32px';
+    s.style.fontWeight = '600';
+    s.textContent = '';
+    roomInputContainerEl.appendChild(s);
+  }
+}
+// elements
+const roomInput = document.getElementById('gc-room');
+const roomInputContainer = document.getElementById('room-input-container');
+const smoothEl = document.getElementById('gc-smooth');
+
+// Create loading overlay
+let loadingDiv = document.createElement('div');
+loadingDiv.id = 'audio-loading';
+loadingDiv.textContent = 'MATTER';
+loadingDiv.style.position = 'fixed';
+loadingDiv.style.top = '0';
+loadingDiv.style.left = '0';
+loadingDiv.style.width = '100vw';
+loadingDiv.style.height = '100vh';
+loadingDiv.style.background = 'rgba(0,0,0,0.4)';
+loadingDiv.style.color = 'black';
+loadingDiv.style.display = 'flex';
+loadingDiv.style.alignItems = 'center';
+loadingDiv.style.justifyContent = 'center';
+loadingDiv.style.fontSize = '12rem';
+loadingDiv.style.zIndex = '999';
+loadingDiv.style.backdropFilter = 'blur(16px)';
+loadingDiv.style.filter = 'blur(4px)';
+document.body.appendChild(loadingDiv);
+
+// Shadow Mask
+const shadowEl = document.getElementById('shadow');
+
 // currentLon & currentLat is in interaction.js
 window.addEventListener('DOMContentLoaded', () => {
   Cesium.Ion.defaultAccessToken =
@@ -35,7 +159,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ensure camera can see point
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, 500),
+    destination: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, height),
+    orientation: {
+      heading: 0, // always north
+      pitch: Cesium.Math.toRadians(-15),
+      roll: 0,
+    },
   });
 
   // create moving point
@@ -44,40 +173,191 @@ window.addEventListener('DOMContentLoaded', () => {
     // point: { pixelSize: 10, color: Cesium.Color.RED },
   });
 
-  // Create loading overlay
-  let loadingDiv = document.createElement('div');
-  loadingDiv.id = 'audio-loading';
-  loadingDiv.textContent = 'DAVID BORING';
-  loadingDiv.style.position = 'fixed';
-  loadingDiv.style.top = '0';
-  loadingDiv.style.left = '0';
-  loadingDiv.style.width = '100vw';
-  loadingDiv.style.height = '100vh';
-  loadingDiv.style.background = 'rgba(0,0,0,0.6)';
-  loadingDiv.style.color = 'white';
-  loadingDiv.style.display = 'flex';
-  loadingDiv.style.alignItems = 'center';
-  loadingDiv.style.justifyContent = 'center';
-  loadingDiv.style.fontSize = '2rem';
-  loadingDiv.style.zIndex = '9999';
-  loadingDiv.style.backdropFilter = 'blur(16px)';
-  loadingDiv.style.transition =
-    'backdrop-filter 0.7s cubic-bezier(.4,0,.2,1), background 0.7s cubic-bezier(.4,0,.2,1)';
-  loadingDiv.style.opacity = '1';
-  document.body.appendChild(loadingDiv);
+  // preload area around
+  // --- Preload tiles around the current location (≈1 km radius) ---
+  async function preloadLocalArea(lat, lon, radiusDeg = 0.01) {
+    const steps = [-radiusDeg, 0, radiusDeg];
+    for (const dx of steps) {
+      for (const dy of steps) {
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(
+            lon + dx,
+            lat + dy,
+            height,
+          ),
+        });
+        // Wait one frame so Cesium requests the new tiles
+        viewer.scene.requestRender();
+        await new Promise((r) => setTimeout(r, 150)); // 150ms delay to let tiles queue
+      }
+    }
+
+    // Return to the original position
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(
+        currentLon,
+        currentLat,
+        height,
+      ),
+      orientation: {
+        heading: 0, // always north
+        pitch: Cesium.Math.toRadians(-15),
+        roll: 0,
+      },
+    });
+
+    console.log('✅ Preloaded local area tiles');
+  }
+
+  preloadLocalArea(currentLat, currentLon, 0.01).then(() => {
+    console.log('Local area ready — starting playback');
+    mapReady = true;
+
+    setTimeout(() => {
+      tryStartExperience();
+    }, 1000);
+  });
+
+  viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
   loadAudio('audio.wav').then(() => {
-    // Animate blur out and fade background
-    loadingDiv.style.backdropFilter = 'blur(0px)';
-    loadingDiv.style.opacity = '0';
+    audioReady = true;
 
-    loadingDiv.style.background = 'rgba(0,0,0,0)';
     setTimeout(() => {
-      loadingDiv.remove();
-      showPlayOnHover();
-    }, 2000);
+      tryStartExperience();
+    }, 1000);
   });
 });
+
+function tryStartExperience() {
+  if (audioReady && mapReady) {
+    const loadingDiv = document.getElementById('audio-loading');
+    if (loadingDiv) loadingDiv.remove();
+    showPlayOnHover(); // your function to start playback/interaction
+  }
+}
+
+// ==== inside your existing code, add these ====
+
+async function loadAudio(url) {
+  audioCtx = new AudioContext();
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+}
+
+let startTime = 0; // when the playback started
+let pauseTime = 0; // how many seconds have already played
+const playBtn = document.getElementById('playBtn');
+playBtn.style.pointerEvents = 'none'; // disable clicks globally
+const playbackTimestamp = document.getElementById('playback-timestamp');
+const pauseBtn = document.getElementById('pauseBtn');
+pauseBtn.style.pointerEvents = 'none'; // disable clicks globally
+const controls = document.getElementsByClassName('control-hover-area');
+let isPlaying = false;
+let isPaused = false;
+let audioEnded = false;
+let restartBtn;
+
+function startPlayback(fromOffset = 0) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  source = audioCtx.createBufferSource();
+  source.buffer = audioBuffer;
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  timeDomainData = new Float32Array(analyser.fftSize);
+
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+
+  startTime = audioCtx.currentTime - fromOffset; // start time accounting for offset
+  source.start(0, fromOffset); // start at offset seconds
+  isPlaying = true;
+
+  // fixed direction (north)
+  let directionAngle = 0; // 0 radians = north
+
+  interval = setInterval(() => {
+    // count speed based on audio amplitude
+    // --- Guest Mode: move map along audio ---
+    analyser.getFloatTimeDomainData(timeDomainData);
+
+    // Compute average amplitude to control speed
+    let sum = 0;
+    for (let i = 0; i < timeDomainData.length; i++) {
+      sum += Math.abs(timeDomainData[i]);
+    }
+    const amplitude = sum / timeDomainData.length;
+
+    let speed = amplitude * 0.001; // tweak as needed
+
+    // Access as GUEST
+    if (isGuest) {
+      currentLat += speed; // move northward
+      currentLon += Math.sin(audioCtx.currentTime) * speed * 0.5; // small sideways movement for variation
+      locDiv.innerText = `${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
+      deltaInfoUI.innerText = amplitude;
+      idUI.innerText = '000GUEST0000';
+
+      // console.log('amp', amplitude);
+      if (movingPoint && viewer) {
+        const newPosition = Cesium.Cartesian3.fromDegrees(
+          currentLon,
+          currentLat,
+          height,
+        );
+        movingPoint.position = newPosition;
+
+        viewer.camera.setView({
+          destination: newPosition,
+          orientation: {
+            heading: 0, // always north
+            pitch: Cesium.Math.toRadians(-15),
+            roll: 0,
+          },
+        });
+      }
+    } else {
+      deltaInfoUI.innerText = amplitude;
+      currentLat += speed;
+    }
+
+    // console.log(
+    //   `→ Moving north | Lon: ${currentLon.toFixed(
+    //     6,
+    //   )} | Lat: ${currentLat.toFixed(6)}`,
+    // );
+  }, intervalFrame);
+
+  source.onended = () => {
+    stopPlayback();
+    isPlaying = false;
+    if (isPaused) return;
+    pauseTime = 0; // reset
+    if (playBtn) playBtn.textContent = 'RESTART';
+    if (playbackTimestamp) playbackTimestamp.textContent = '00:00';
+  };
+}
+
+function pausePlayback() {
+  if (!isPlaying) return;
+  source.stop();
+  clearInterval(interval);
+  pauseTime = audioCtx.currentTime - startTime; // save current position
+  isPlaying = false;
+  if (playBtn) playBtn.textContent = 'PLAY';
+}
+
+function togglePlayback() {
+  if (isPlaying) {
+    pausePlayback();
+  } else {
+    startPlayback(pauseTime);
+    if (playBtn) playBtn.textContent = 'PAUSE';
+  }
+}
 
 function stopPlayback() {
   if (source) {
@@ -91,75 +371,6 @@ function stopPlayback() {
   console.log('Playback stopped');
 }
 
-// ==== inside your existing code, add these ====
-
-async function loadAudio(url) {
-  audioCtx = new AudioContext();
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-  audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-}
-
-function startPlayback() {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  source = audioCtx.createBufferSource();
-  source.buffer = audioBuffer;
-
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
-  timeDomainData = new Float32Array(analyser.fftSize);
-
-  source.connect(analyser);
-  analyser.connect(audioCtx.destination);
-  source.start();
-
-  console.log('Playback started');
-
-  // fixed direction (north)
-  let directionAngle = 0; // 0 radians = north
-  let speed = 0.0002; // forward step per interval
-
-  interval = setInterval(() => {
-    // compute deltas for northward movement
-    const forwardLonDelta = Math.sin(directionAngle) * speed; // left/right
-    const forwardLatDelta = Math.cos(directionAngle) * speed; // forward
-
-    // update position
-    // Access as GUEST
-    // currentLon += forwardLonDelta;
-    currentLat += forwardLatDelta;
-
-    // update Cesium entity
-    if (movingPoint && viewer) {
-      const newPosition = Cesium.Cartesian3.fromDegrees(
-        currentLon,
-        currentLat,
-        height,
-      );
-      movingPoint.position = newPosition;
-
-      // move and orient camera north
-      viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, 500),
-        orientation: {
-          heading: directionAngle,
-          pitch: Cesium.Math.toRadians(-15),
-          roll: 0,
-        },
-      });
-    }
-
-    console.log(
-      `→ Moving north | Lon: ${currentLon.toFixed(
-        6,
-      )} | Lat: ${currentLat.toFixed(6)}`,
-    );
-  }, intervalFrame);
-
-  source.onended = stopPlayback;
-}
-
 // ---- USER LOCATION
 let currentLon = -74.006; // Initial longitude (New York City)
 let currentLat = 40.7128; // Initial latitude
@@ -171,7 +382,7 @@ locDiv.style.position = 'fixed';
 locDiv.style.bottom = '10px';
 locDiv.style.left = '10px';
 locDiv.style.color = 'white';
-locDiv.style.zIndex = '1000';
+locDiv.style.zIndex = '10000';
 locDiv.style.fontFamily = "'Wallpoet', sans-serif";
 locDiv.innerText = '00.00, 00.00';
 document.body.appendChild(locDiv);
@@ -200,17 +411,6 @@ function showUserLocation() {
 
 // Call location function on page load
 document.addEventListener('DOMContentLoaded', showUserLocation);
-
-// GLITCH
-const glitchCanvas = document.getElementById('glitchCanvas');
-const gctx = glitchCanvas.getContext('2d');
-
-function resizeCanvas() {
-  glitchCanvas.width = window.innerWidth;
-  glitchCanvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
 
 // Function to resize the main canvas to full screen dimensions
 function resizeCanvasToFullScreen() {
@@ -241,92 +441,7 @@ function resizeCanvasToFullScreen() {
 // ---- GYRO ----
 // Connects to the server (Socket.IO) and applies incoming gyro messages to the global map.
 (function () {
-  // Prefer same protocol to avoid mixed-content issues
-  const defaultServer = `https://714870b841be.ngrok-free.app`;
-
   let status = null;
-
-  // Create a small overlay UI
-  const ui = document.createElement('div');
-  ui.id = 'room-code-panel';
-  ui.style.position = 'fixed';
-  ui.style.left = '50%';
-  ui.style.top = '50%';
-  ui.style.transform = 'translate(-50%, -50%)';
-  ui.style.zIndex = 30000;
-  ui.style.background = 'rgba(0,0,0,0.6)';
-  ui.style.color = 'white';
-  ui.style.padding = '10px';
-  ui.style.borderRadius = '8px';
-  ui.style.fontSize = '13px';
-  ui.style.maxWidth = '300px';
-  ui.innerHTML = `
-    <p>Enter the room code and connect to stream gyroscope data from your mobile device to [DAVIDBORING][MATTER]</p>
-
-    <div id="room-input-container" style="display:flex;gap:6px;margin-bottom:6px"></div>
-    <input id="gc-room" type="hidden" />
-    <p>Don't have a mobile device?<br/ ></p>
-    <div style="display:flex;gap:6px;margin-bottom:6px"><button id="gc-connect">Guest</button></div>
-  `;
-  // <div id='gc-status' style='margin-top:6px;font-size:12px;opacity:0.9'>
-  //   Disconnected
-  // </div>;
-
-  document.body.appendChild(ui);
-
-  // GYRO INFO UI
-  const gyroInfoUI = document.createElement('div');
-  gyroInfoUI.id = 'gyro-info-ui';
-  gyroInfoUI.style.position = 'fixed';
-  gyroInfoUI.style.left = '10px';
-  gyroInfoUI.style.top = '10px';
-  gyroInfoUI.style.zIndex = 30000;
-  gyroInfoUI.style.color = 'white';
-  gyroInfoUI.innerText = '00.00';
-  document.body.appendChild(gyroInfoUI);
-
-  const deltaInfoUI = document.createElement('div');
-  deltaInfoUI.id = 'delta-info-ui';
-  deltaInfoUI.style.position = 'fixed';
-  deltaInfoUI.style.right = '10px';
-  deltaInfoUI.style.top = '10px';
-  deltaInfoUI.style.zIndex = 30000;
-  deltaInfoUI.style.color = 'white';
-  deltaInfoUI.innerText = '00.00';
-  document.body.appendChild(deltaInfoUI);
-
-  const idUI = document.createElement('div');
-  idUI.id = 'id-ui';
-  idUI.style.position = 'fixed';
-  idUI.style.bottom = '10px';
-  idUI.style.right = '10px';
-  idUI.style.zIndex = 30000;
-  idUI.style.color = 'white';
-  idUI.innerText = '000000000000';
-  document.body.appendChild(idUI);
-
-  // create visible digit spans
-  const roomInputContainerEl = document.getElementById('room-input-container');
-  if (roomInputContainerEl && roomInputContainerEl.children.length === 0) {
-    for (let i = 0; i < 4; i++) {
-      const s = document.createElement('span');
-      s.style.width = '40px';
-      s.style.height = '60px';
-      s.style.background = '#ccc';
-      s.style.borderRadius = '8px';
-      s.style.display = 'inline-flex';
-      s.style.alignItems = 'center';
-      s.style.justifyContent = 'center';
-      s.style.fontSize = '20px';
-      s.style.fontWeight = '600';
-      s.textContent = '';
-      roomInputContainerEl.appendChild(s);
-    }
-  }
-  // elements
-  const roomInput = document.getElementById('gc-room');
-  const roomInputContainer = document.getElementById('room-input-container');
-  const smoothEl = document.getElementById('gc-smooth');
 
   let socket = null;
   let last = { alpha: 0, beta: 0, gamma: 0 };
@@ -360,9 +475,9 @@ function resizeCanvasToFullScreen() {
             roomInputContainer.children[i].textContent = j.room[i] || '';
           }
           // Add Enter Button
-          roomInputContainer.innerHTML += `<span id="gc-loading-room" style="margin-left:8px width:100%;display:flex;align-items:center;justify-content:center;">${
-            !status ? 'Waiting...' : status
-          }</span>`;
+          // roomInputContainer.innerHTML += `<span id="gc-loading-room" style="margin-left:8px width:100%;display:flex;align-items:center;justify-content:center;">${
+          //   !status ? 'Waiting...' : status
+          // }</span>`;
 
           // roomInputContainer.innerHTML += `<button id="gc-enter-room" style="margin-left:8px width:100%;">Enter</button>`;
           console.log('Assigned room:', j.room, 'from', url);
@@ -389,12 +504,14 @@ function resizeCanvasToFullScreen() {
   socket = io(defaultServer);
   socket.on('join-result', (data) => {
     if (data.success && data.source === 'remote') {
+      hasSelectedMode = true;
       // Change the UI Guest Panel
       // Hide the room code UI
-      const roomCodePanel = document.getElementById('room-code-panel');
+      hideRoomCodePanel();
       status = 'OK';
       setTimeout(() => {
-        roomCodePanel.style.display = 'none';
+        playBtn.style.pointerEvents = 'auto'; // enable clicks globally
+        pauseBtn.style.pointerEvents = 'auto'; // enable clicks globally
       }, 1000);
     } else console.log('Wrong room code.');
   });
@@ -402,18 +519,19 @@ function resizeCanvasToFullScreen() {
   socket.on('gyro', (data) => {
     // Update Gyro UI
     gyroInfoUI.innerText = data.gyro;
-    deltaInfoUI.innerText = data.delta;
+    // deltaInfoUI.innerText = data.delta;
     idUI.innerText = data.id;
 
     // change distance of lon with delta
-    // currentLon += Number(data.delta) * 0.0001;
-    currentLat += Math.abs(Number(data.delta)) * 0.0001;
-    // change camera rot direction with gyro
+    // if (isPlaying) {
+    //   currentLat += Math.abs(Number(data.delta)) * 0.0001; // move according to how much you rotate your phone
+    // } // only move forward if music is playing
+
     // data.gyro controls rotation (turn left/right)
     const gyroValue = Number(data.gyro) || 0;
 
     // Adjust heading based on gyro — scale down so it’s not too sensitive
-    cameraHeading = Cesium.Math.toRadians(gyroValue * 0.1); // radians per update (tweak multiplier)
+    cameraHeading = Cesium.Math.toRadians(gyroValue * 0.1 * -1); // radians per update (tweak multiplier)
 
     if (viewer) {
       const newPosition = Cesium.Cartesian3.fromDegrees(
@@ -448,3 +566,321 @@ function resizeCanvasToFullScreen() {
 })();
 
 // --- SOCKET ---
+
+// UI ELEMENTS & LOGIC
+// redirect to /remote/ if on mobile device
+if (isMobile) {
+  const currentUrl = new URL(window.location.href);
+  currentUrl.pathname = '/remote/';
+  window.location.href = currentUrl.href;
+}
+
+// UI elements
+// Playback timestamp element
+playbackTimestamp.id = 'playback-timestamp';
+playbackTimestamp.style.position = 'fixed';
+playbackTimestamp.style.bottom = '30px';
+playbackTimestamp.style.left = '50%';
+playbackTimestamp.style.transform = 'translateX(-50%)';
+playbackTimestamp.style.color = 'white';
+playbackTimestamp.style.fontFamily = "'Wallpoet', sans-serif";
+playbackTimestamp.style.fontSize = '1.2rem';
+playbackTimestamp.style.zIndex = 10000;
+playbackTimestamp.style.textContent = '00:00';
+playbackTimestamp.style.textAlign = 'center';
+playbackTimestamp.style.display = 'flex';
+playbackTimestamp.style.alignItems = 'center';
+playbackTimestamp.style.justifyContent = 'center';
+playbackTimestamp.style.color = 'white';
+document.body.appendChild(playbackTimestamp);
+
+let playbackInterval = null;
+let playbackStartTime = null;
+
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return [h, m, s].map((v) => v.toString().padStart(2, '0')).join(':');
+}
+
+function startPlaybackTimestamp(offset = 0) {
+  if (window.audioCtx && window.audioCtx.currentTime !== undefined) {
+    playbackStartTime = window.audioCtx.currentTime - offset;
+  } else {
+    playbackStartTime = performance.now() / 1000 - offset;
+  }
+
+  if (playbackInterval) clearInterval(playbackInterval);
+
+  playbackInterval = setInterval(() => {
+    let elapsed;
+    if (window.audioCtx && window.audioCtx.currentTime !== undefined) {
+      elapsed = window.audioCtx.currentTime - playbackStartTime;
+    } else {
+      elapsed = performance.now() / 1000 - playbackStartTime;
+    }
+    playbackTimestamp.textContent = formatTime(elapsed);
+  }, 500);
+}
+
+function pausePlaybackTimestamp(time) {
+  if (playbackInterval) clearInterval(playbackInterval);
+  playbackTimestamp.textContent = formatTime(time);
+}
+
+function stopPlaybackTimestamp() {
+  if (playbackInterval) clearInterval(playbackInterval);
+  playbackInterval = null;
+  playbackTimestamp.textContent = '00:00';
+}
+
+function showPlayOnHover() {
+  playBtn.addEventListener('mouseenter', () => {
+    if (isPlaying && !audioEnded) {
+      pauseBtn.style.opacity = '1';
+      playBtn.style.opacity = '0';
+    } else if (!isPlaying && !audioEnded) {
+      playBtn.style.opacity = '1';
+      pauseBtn.style.opacity = '0';
+    }
+  });
+  playBtn.addEventListener('mouseleave', () => {
+    playBtn.style.opacity = '0';
+    pauseBtn.style.opacity = '0';
+  });
+
+  pauseBtn.style.zIndex = '15';
+  playBtn.style.zIndex = '16';
+}
+
+// Show pause button only on hover
+function showPauseOnHover() {
+  pauseBtn.addEventListener('mouseenter', () => {
+    pauseBtn.style.opacity = '1';
+  });
+  pauseBtn.addEventListener('mouseleave', () => {
+    pauseBtn.style.opacity = '0';
+  });
+  pauseBtn.style.zIndex = '16';
+  playBtn.style.zIndex = '15';
+}
+
+// Create restart button
+function createRestartBtn() {
+  if (!restartBtn) {
+    restartBtn = document.createElement('button');
+    restartBtn.id = 'restartBtn';
+    restartBtn.className = 'wallpoet-regular';
+    restartBtn.textContent = '⟲ RESTART';
+    restartBtn.style.position = 'fixed';
+    restartBtn.style.top = '50%';
+    restartBtn.style.left = '50%';
+    restartBtn.style.transform = 'translate(-50%, -50%)';
+    restartBtn.style.zIndex = '13';
+    restartBtn.style.display = 'block';
+    controls[0].appendChild(restartBtn);
+    restartBtn.addEventListener('click', () => {
+      showPlayButton();
+      audioEnded = false;
+      document.dispatchEvent(new CustomEvent('restart-clicked'));
+    });
+  } else {
+    restartBtn.style.display = 'block';
+  }
+}
+
+// Click Listener
+// Play button click
+playBtn.addEventListener('click', function (e) {
+  e.preventDefault();
+  // Ensure audio context is resumed for autoplay policy
+  if (window.audioCtx && window.audioCtx.state === 'suspended') {
+    window.audioCtx.resume();
+  }
+  startPlayback(pauseTime || 0); // <-- pass pauseTime
+  isPlaying = true;
+  isPaused = false;
+  audioEnded = false;
+  document.dispatchEvent(new CustomEvent('play-clicked'));
+  showPauseOnHover();
+  startPlaybackTimestamp(pauseTime || 0);
+});
+
+// Pause button click
+pauseBtn.addEventListener('click', function (e) {
+  e.preventDefault();
+
+  if (!isPlaying) return;
+
+  // Stop audio and save current position
+  if (source) {
+    try {
+      source.stop();
+    } catch (e) {}
+    source.disconnect();
+    source = null;
+  }
+
+  clearInterval(interval);
+
+  // Save offset to resume from
+  pauseTime = audioCtx.currentTime - startTime;
+
+  isPlaying = false;
+  isPaused = true;
+  audioEnded = false;
+
+  document.dispatchEvent(new CustomEvent('pause-clicked'));
+
+  // fade out play button & hide
+  document.getElementById('pauseBtn').style.opacity = '0';
+  showPlayOnHover();
+  pausePlayback(pauseTime);
+  pausePlaybackTimestamp(pauseTime);
+});
+
+// Listen for audio end event from convert-sound.js
+document.addEventListener('audio-ended', function () {
+  isPlaying = false;
+  isPaused = false;
+  audioEnded = true;
+  createRestartBtn();
+  stopPlaybackTimestamp();
+});
+
+// Listen for restart event
+document.addEventListener('restart-clicked', function () {
+  if (restartBtn) restartBtn.style.display = 'none';
+  isPlaying = false;
+  isPaused = false;
+  showPlayButton();
+});
+
+const guestBtn = document.getElementById('gc-connect');
+guestBtn.addEventListener('click', () => {
+  isGuest = true;
+  hasSelectedMode = true;
+
+  // Hide the room UI
+  hideRoomCodePanel();
+
+  // Enable playback controls
+  playBtn.style.pointerEvents = 'auto';
+  pauseBtn.style.pointerEvents = 'auto';
+});
+
+// Space bar listener
+// Spacebar Play/Pause
+document.addEventListener('keydown', (e) => {
+  // Avoid triggering if typing in an input
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'))
+    return;
+
+  if (e.code === 'Space' || e.key === ' ') {
+    e.preventDefault();
+    togglePlayback();
+  }
+});
+
+function hideRoomCodePanel() {
+  const roomCodePanel = document.getElementById('room-code-panel');
+  if (roomCodePanel) {
+    roomCodePanel.style.backdropFilter = 'blur(0px)';
+    roomCodePanel.style.opacity = '0';
+  }
+
+  setTimeout(() => {
+    if (roomCodePanel) roomCodePanel.remove();
+  }, 700);
+}
+
+// --- BLINKING ---
+// Text animation
+const texts = ['MATTER', 'DAVID', 'BORING', '@EKEZIA'];
+let textInterval;
+let textCount = 0;
+textInterval = setInterval(() => {
+  textCount++;
+  if (loadingDiv) {
+    loadingDiv.textContent = texts[textCount % texts.length];
+  }
+}, 100);
+
+// Webcam
+// === BLINK DETECTION WITH MEDIAPIPE ===
+const videoElement = document.createElement('video');
+videoElement.autoplay = true;
+videoElement.style.display = 'none';
+document.body.appendChild(videoElement);
+
+let lastBlinkTime = 0;
+const blinkThreshold = 0.25; // smaller = more sensitive
+
+const faceMesh = new FaceMesh({
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true, // gives iris landmarks
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5,
+});
+
+faceMesh.onResults(onResults);
+
+const camera = new Camera(videoElement, {
+  onFrame: async () => await faceMesh.send({ image: videoElement }),
+  width: 320,
+  height: 240,
+});
+camera.start();
+
+function onResults(results) {
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0)
+    return;
+
+  const landmarks = results.multiFaceLandmarks[0];
+
+  // Left eye: 159 = top, 145 = bottom
+  const leftTop = landmarks[159];
+  const leftBottom = landmarks[145];
+  const leftDist = Math.hypot(
+    leftTop.x - leftBottom.x,
+    leftTop.y - leftBottom.y,
+  );
+
+  // Right eye: 386 = top, 374 = bottom
+  const rightTop = landmarks[386];
+  const rightBottom = landmarks[374];
+  const rightDist = Math.hypot(
+    rightTop.x - rightBottom.x,
+    rightTop.y - rightBottom.y,
+  );
+
+  // approximate eye width
+  const leftWidth = Math.hypot(
+    landmarks[33].x - landmarks[133].x,
+    landmarks[33].y - landmarks[133].y,
+  );
+  const rightWidth = Math.hypot(
+    landmarks[263].x - landmarks[362].x,
+    landmarks[263].y - landmarks[362].y,
+  );
+
+  const ratio = (leftDist / leftWidth + rightDist / rightWidth) / 2;
+
+  if (ratio < blinkThreshold && Date.now() - lastBlinkTime > 500) {
+    lastBlinkTime = Date.now();
+    console.log('Blink detected!');
+    if (loadingDiv) loadingDiv.style.background = 'black';
+
+    // Optional: fade back after 200ms
+    setTimeout(() => {
+      if (loadingDiv) loadingDiv.style.background = 'rgba(0,0,0,0.4)';
+    }, 200);
+  }
+}
