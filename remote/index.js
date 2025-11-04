@@ -2,13 +2,12 @@ import { defaultServer } from '../config';
 import { isMobile } from '../utils';
 
 (function () {
-  alert('a');
   // redirect to /  if on desktop device
-  // if (!isMobile) {
-  //   const currentUrl = new URL(window.location.href);
-  //   currentUrl.pathname = '/';
-  //   window.location.href = currentUrl.href;
-  // }
+  if (!isMobile) {
+    const currentUrl = new URL(window.location.href);
+    currentUrl.pathname = '/';
+    window.location.href = currentUrl.href;
+  }
 
   let status = null;
 

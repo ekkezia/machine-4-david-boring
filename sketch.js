@@ -83,7 +83,7 @@ ui.innerHTML = `
     <div id="room-input-container" style="display:flex;gap:6px;margin-bottom:6px"></div>
     <input id="gc-room" type="hidden" />
     <p>Don't have a mobile device?<br/ ></p>
-    <div style="display:flex;gap:6px;margin-bottom:6px"><button id="gc-connect">Guest</button></div>
+    <div style="display:flex;gap:6px;margin-bottom:6px"><button id="gc-connect">AUTOPILOT</button></div>
   `;
 // <div id='gc-status' style='margin-top:6px;font-size:12px;opacity:0.9'>
 //   Disconnected
@@ -124,7 +124,7 @@ loadingDiv.style.left = '0';
 loadingDiv.style.width = '100vw';
 loadingDiv.style.height = '100vh';
 loadingDiv.style.background = 'rgba(0,0,0,0.4)';
-loadingDiv.style.color = 'black';
+loadingDiv.style.color = 'white';
 loadingDiv.style.display = 'flex';
 loadingDiv.style.alignItems = 'center';
 loadingDiv.style.justifyContent = 'center';
@@ -133,9 +133,6 @@ loadingDiv.style.zIndex = '999';
 loadingDiv.style.backdropFilter = 'blur(16px)';
 loadingDiv.style.filter = 'blur(4px)';
 document.body.appendChild(loadingDiv);
-
-// Shadow Mask
-const shadowEl = document.getElementById('shadow');
 
 // currentLon & currentLat is in interaction.js
 window.addEventListener('DOMContentLoaded', () => {
@@ -295,11 +292,11 @@ function startPlayback(fromOffset = 0) {
 
     // Access as GUEST
     if (isGuest) {
-      currentLat += speed; // move northward
+      currentLat += speed * 2; // move northward
       currentLon += Math.sin(audioCtx.currentTime) * speed * 0.5; // small sideways movement for variation
       locDiv.innerText = `${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
       deltaInfoUI.innerText = amplitude;
-      idUI.innerText = '000GUEST0000';
+      idUI.innerText = '0AUT0PIL0T00';
 
       // console.log('amp', amplitude);
       if (movingPoint && viewer) {
@@ -411,32 +408,6 @@ function showUserLocation() {
 
 // Call location function on page load
 document.addEventListener('DOMContentLoaded', showUserLocation);
-
-// Function to resize the main canvas to full screen dimensions
-function resizeCanvasToFullScreen() {
-  if (!canvas) return;
-
-  // Get the device pixel ratio for high-DPI screens
-  const pixelRatio = window.devicePixelRatio || 1;
-
-  // Set the logical size (CSS size)
-  canvas.style.width = '100vw';
-  canvas.style.height = '100vh';
-
-  // Get the display size of the canvas in CSS pixels
-  const displayWidth = window.innerWidth;
-  const displayHeight = window.innerHeight;
-
-  // Check if the canvas is a different size (ignoring pixelRatio for this check)
-  const needResize =
-    canvas.width !== displayWidth || canvas.height !== displayHeight;
-
-  if (needResize) {
-    // Set actual size in pixels, scaled for the device
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
-  }
-}
 
 // ---- GYRO ----
 // Connects to the server (Socket.IO) and applies incoming gyro messages to the global map.
@@ -875,12 +846,18 @@ function onResults(results) {
 
   if (ratio < blinkThreshold && Date.now() - lastBlinkTime > 500) {
     lastBlinkTime = Date.now();
-    console.log('Blink detected!');
-    if (loadingDiv) loadingDiv.style.background = 'black';
+    // console.log('Blink detected!');
+    if (loadingDiv) {
+      loadingDiv.style.background = 'rgba(0,0,0,0)';
+      loadingDiv.style.color = 'white';
+    }
 
     // Optional: fade back after 200ms
     setTimeout(() => {
-      if (loadingDiv) loadingDiv.style.background = 'rgba(0,0,0,0.4)';
+      if (loadingDiv) {
+        loadingDiv.style.background = 'rgba(0,0,0,1)';
+        loadingDiv.style.color = 'black';
+      }
     }, 200);
   }
 }
