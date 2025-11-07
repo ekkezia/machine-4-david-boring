@@ -126,6 +126,7 @@ import { isMobile } from '../utils.js';
 
   // request permission if needed (for iOS)
   async function enableCompass() {
+    alert('aa');
     const ok =
       typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function'
@@ -213,16 +214,16 @@ import { isMobile } from '../utils.js';
     socket.emit('join-room', code, 'remote');
   });
 
-  // const gyroBtn = document.createElement('button');
-  // gyroBtn.textContent = 'Enable Gyro';
-  // gyroBtn.style.position = 'fixed';
-  // gyroBtn.style.top = '10px';
-  // gyroBtn.style.left = '10px';
-  // gyroBtn.style.zIndex = 9999;
-  // document.body.appendChild(gyroBtn);
+  const gyroBtn = document.createElement('button');
+  gyroBtn.textContent = 'Enable Gyro';
+  gyroBtn.style.position = 'fixed';
+  gyroBtn.style.top = '10px';
+  gyroBtn.style.left = '10px';
+  gyroBtn.style.zIndex = 9999;
+  document.body.appendChild(gyroBtn);
 
-  // gyroBtn.addEventListener('click', async () => {
-  //   await enableCompass();
-  //   gyroBtn.style.display = 'none'; // hide after enabling
-  // });
+  gyroBtn.addEventListener('click', async () => {
+    await enableCompass();
+    gyroBtn.style.display = 'none'; // hide after enabling
+  });
 })();

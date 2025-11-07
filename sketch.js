@@ -371,7 +371,6 @@ function stopPlayback() {
 // ---- USER LOCATION
 let currentLon = -74.006; // Initial longitude (New York City)
 let currentLat = 40.7128; // Initial latitude
-
 // --- USER LOCATION (LATITUDE & LONGITUDE) ---
 const locDiv = document.createElement('div');
 locDiv.id = 'location-display';
@@ -392,7 +391,7 @@ function showUserLocation() {
         const lon = position.coords.longitude;
         // update global lat & lon
         currentLat = lat;
-
+        currentLon = lon;
         console.log(`User location: Latitude ${lat}, Longitude ${lon}`);
         // Optionally display on page
         locDiv.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
