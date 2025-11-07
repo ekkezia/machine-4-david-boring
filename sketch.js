@@ -54,7 +54,7 @@ idUI.style.bottom = '10px';
 idUI.style.right = '10px';
 idUI.style.zIndex = 30000;
 idUI.style.color = 'white';
-idUI.innerText = '000000000000';
+idUI.innerText = '000@EKEZIA00';
 document.body.appendChild(idUI);
 
 // Create a small overlay UI
@@ -318,7 +318,7 @@ function startPlayback(fromOffset = 0) {
       }
     } else {
       deltaInfoUI.innerText = amplitude;
-      currentLat += speed;
+      currentLat += speed * 2;
     }
 
     // console.log(
@@ -348,11 +348,17 @@ function pausePlayback() {
 }
 
 function togglePlayback() {
+  if (!playBtn || !pauseBtn) return;
+
+  const canPlay = playBtn.style.pointerEvents !== 'none';
+  const canPause = pauseBtn.style.pointerEvents !== 'none';
+
   if (isPlaying) {
-    pausePlayback();
+    if (!canPause) return;
+    pauseBtn.click();
   } else {
-    startPlayback(pauseTime);
-    if (playBtn) playBtn.textContent = 'PAUSE';
+    if (!canPlay) return;
+    playBtn.click();
   }
 }
 
@@ -493,9 +499,9 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
     idUI.innerText = data.id;
 
     // change distance of lon with delta
-    // if (isPlaying) {
-    //   currentLat += Math.abs(Number(data.delta)) * 0.0001; // move according to how much you rotate your phone
-    // } // only move forward if music is playing
+    if (isPlaying) {
+      currentLat += Math.abs(Number(data.delta)) * 0.0001; // move according to how much you rotate your phone
+    } // only move forward if music is playing
 
     // data.gyro controls rotation (turn left/right)
     const gyroValue = Number(data.gyro) || 0;
@@ -768,7 +774,7 @@ function hideRoomCodePanel() {
 
 // --- BLINKING ---
 // Text animation
-const texts = ['MATTER', 'DAVID', 'BORING', '@EKEZIA'];
+const texts = ['MATTER', 'DAVID', 'BORING'];
 let textInterval;
 let textCount = 0;
 textInterval = setInterval(() => {

@@ -10,6 +10,37 @@ import { isMobile } from '../utils.js';
   }
 
   let status = null;
+  let gyroEnabled = false;
+
+  const guestPanelEl = document.getElementById('guest-panel');
+  const roomInputContainerEl = document.getElementById('room-input-container');
+  const gyroDependentEls = [];
+  let gyroNotice = null;
+  let gyroBtn = null;
+
+  if (guestPanelEl) {
+    const existingParagraphs = guestPanelEl.querySelectorAll('p');
+    existingParagraphs.forEach((el) => gyroDependentEls.push(el));
+
+    gyroNotice = document.createElement('p');
+    gyroNotice.textContent =
+      'You have decided to use your mobile device as a remote. Gyroscope access is required to use your mobile device as a controller for [MATTER] music video. Tap "Enable Gyro" to continue.';
+    gyroNotice.style.margin = '0 0 8px 0';
+    gyroNotice.style.color = '#ffffff';
+    guestPanelEl.insertBefore(gyroNotice, guestPanelEl.firstChild);
+  }
+
+  function toggleRoomInputAvailability(enabled) {
+    if (roomInputContainerEl) {
+      roomInputContainerEl.style.display = enabled ? 'flex' : 'none';
+    }
+    gyroDependentEls.forEach((el) => {
+      el.style.display = enabled ? '' : 'none';
+    });
+    if (gyroNotice) {
+      gyroNotice.style.display = enabled ? 'none' : 'block';
+    }
+  }
 
   const enterBtn = document.createElement('button');
   enterBtn.textContent = status ?? 'Enter';
@@ -17,7 +48,6 @@ import { isMobile } from '../utils.js';
   enterBtn.style.pointerEvents = 'auto';
   enterBtn.style.zIndex = 9999;
 
-  const roomInputContainerEl = document.getElementById('room-input-container');
   if (roomInputContainerEl && roomInputContainerEl.children.length === 0) {
     for (let i = 0; i < 4; i++) {
       const s = document.createElement('span');
@@ -37,6 +67,8 @@ import { isMobile } from '../utils.js';
     }
     roomInputContainerEl.appendChild(enterBtn);
   }
+
+  toggleRoomInputAvailability(false);
 
   // --- GYRO ARROW UI ---
   // === Compass that rotates with gyroscope ===
@@ -126,21 +158,36 @@ import { isMobile } from '../utils.js';
 
   // request permission if needed (for iOS)
   async function enableCompass() {
-    alert('aa');
-    const ok =
-      typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function'
-        ? (await DeviceOrientationEvent.requestPermission()) === 'granted'
-        : true;
+    if (gyroEnabled) return true;
+
+    let ok = true;
+
+    try {
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
+        ok = (await DeviceOrientationEvent.requestPermission()) === 'granted';
+      }
+    } catch (err) {
+      ok = false;
+      console.warn('Compass permission request failed', err);
+    }
 
     if (!ok) {
-      alert('denied');
-
+      if (gyroNotice) {
+        gyroNotice.textContent = 'Gyro is required. Permission denied.';
+      }
+      alert('Gyroscope access is required.');
       console.warn('Compass permission denied');
-      return;
+      return false;
     }
 
     window.addEventListener('deviceorientation', handleOrientation, true);
+    gyroEnabled = true;
+    toggleRoomInputAvailability(true);
+    if (gyroBtn) gyroBtn.style.display = 'none';
+    return true;
   }
 
   // --- ROOM INPUT HANDLING ---
@@ -193,11 +240,10 @@ import { isMobile } from '../utils.js';
     if (data.success && data.source === 'remote') {
       localStorage.setItem('room-code', data.room); // set to LS
       enableCompass();
-      const guestPanelEl = document.getElementById('guest-panel');
       status = 'OK';
       enterBtn.textContent = 'OK';
       setTimeout(() => {
-        guestPanelEl.style.display = 'none';
+        if (guestPanelEl) guestPanelEl.style.display = 'none';
         compassWrapper.style.display = 'block';
       }, 1000);
     } else alert('Wrong room code.');
@@ -214,16 +260,16 @@ import { isMobile } from '../utils.js';
     socket.emit('join-room', code, 'remote');
   });
 
-  const gyroBtn = document.createElement('button');
+  gyroBtn = document.createElement('button');
   gyroBtn.textContent = 'Enable Gyro';
-  gyroBtn.style.position = 'fixed';
-  gyroBtn.style.top = '10px';
-  gyroBtn.style.left = '10px';
+  gyroBtn.style.width = 'fit-content';
+  gyroBtn.style.border = '1px solid rgba(255,255,255,1)';
+  gyroBtn.style.position = 'relative';
   gyroBtn.style.zIndex = 9999;
   document.body.appendChild(gyroBtn);
 
   gyroBtn.addEventListener('click', async () => {
-    await enableCompass();
-    gyroBtn.style.display = 'none'; // hide after enabling
+    const ok = await enableCompass();
+    if (ok) gyroBtn.style.display = 'none';
   });
 })();
