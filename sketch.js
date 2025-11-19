@@ -217,7 +217,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
-  loadAudio('audio.wav').then(() => {
+  loadAudio('./assets/audio.wav').then(() => {
     audioReady = true;
 
     setTimeout(() => {
@@ -240,6 +240,7 @@ async function loadAudio(url) {
   audioCtx = new AudioContext();
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
+  console.log('🎤 Audio loaded');
   audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 }
 
