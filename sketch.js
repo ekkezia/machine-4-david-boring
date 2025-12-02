@@ -425,10 +425,16 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
   let offset = { alpha: 0, beta: 0, gamma: 0 };
   let smoothing = 0.2;
 
-  // On init, request a room code from the server and prefill the room input
+  // On init, initialize socket early and request a room code from the server and prefill the room input
+  socket = io(defaultServer);
+
   (async function assignRoom() {
     const tried = [];
-    const candidates = [`${defaultServer}/api/new-room`, '/api/new-room'];
+    const candidates = [
+      `${defaultServer}/api/new-room`,
+      'http://localhost:5503/api/new-room',
+      '/api/new-room',
+    ];
 
     for (const url of candidates) {
       try {
@@ -444,8 +450,14 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
           continue;
         }
         const j = await resp.json();
-        // desktop join the room
-        socket.emit('join-room', j.room, 'desktop');
+        // desktop join the room (guarded in case socket isn't ready)
+        try {
+          if (socket && typeof socket.emit === 'function') {
+            socket.emit('join-room', j.room, 'desktop');
+          }
+        } catch (emitErr) {
+          console.warn('socket.emit failed while assigning room:', emitErr);
+        }
         if (j && j.room) {
           roomInput.value = j.room;
           for (let i = 0; i < roomInputContainer.children.length; i++) {
@@ -545,11 +557,39 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
 // --- SOCKET ---
 
 // UI ELEMENTS & LOGIC
-// redirect to /remote/ if on mobile device
+// redirect to /remote/ if on mobile device — but only if that path exists
 if (isMobile) {
-  const currentUrl = new URL(window.location.href);
-  currentUrl.pathname = '/remote/';
-  window.location.href = currentUrl.href;
+  (async () => {
+    try {
+      const remoteIndex = new URL('/remote/index.html', window.location.origin)
+        .href;
+      // Try a HEAD request first; some hosts don't allow HEAD so fall back to GET
+      let ok = false;
+      try {
+        const resp = await fetch(remoteIndex, { method: 'HEAD' });
+        ok = resp && resp.ok;
+      } catch (headErr) {
+        try {
+          const resp2 = await fetch(remoteIndex, { method: 'GET' });
+          ok = resp2 && resp2.ok;
+        } catch (getErr) {
+          ok = false;
+        }
+      }
+
+      if (ok) {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.pathname = '/remote/';
+        window.location.href = currentUrl.href;
+      } else {
+        console.warn(
+          'Remote path not found; skipping mobile redirect to /remote/',
+        );
+      }
+    } catch (err) {
+      console.warn('Error checking remote path, skipping redirect', err);
+    }
+  })();
 }
 
 // UI elements
