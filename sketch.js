@@ -252,6 +252,48 @@ const playbackTimestamp = document.getElementById('playback-timestamp');
 const pauseBtn = document.getElementById('pauseBtn');
 pauseBtn.style.pointerEvents = 'none'; // disable clicks globally
 const controls = document.getElementsByClassName('control-hover-area');
+
+// --- SCRUBBER ---
+let scrubber = document.getElementById('audio-scrubber');
+if (!scrubber) {
+  scrubber = document.createElement('input');
+  scrubber.type = 'range';
+  scrubber.id = 'audio-scrubber';
+  scrubber.min = 0;
+  scrubber.max = 100;
+  scrubber.value = 0;
+  scrubber.step = 0.01;
+  scrubber.style.position = 'fixed';
+  scrubber.style.left = '50%';
+  scrubber.style.bottom = '70px';
+  scrubber.style.transform = 'translateX(-50%)';
+  scrubber.style.width = '60vw';
+  scrubber.style.zIndex = 10001;
+  scrubber.style.opacity = 0.8;
+  document.body.appendChild(scrubber);
+}
+
+let scrubberIsDragging = false;
+
+scrubber.addEventListener('input', (e) => {
+  scrubberIsDragging = true;
+  if (!audioBuffer) return;
+  const percent = parseFloat(scrubber.value) / 100;
+  const newTime = percent * audioBuffer.duration;
+  if (playbackTimestamp) playbackTimestamp.textContent = formatTime(newTime);
+});
+
+scrubber.addEventListener('change', (e) => {
+  if (!audioBuffer) return;
+  const percent = parseFloat(scrubber.value) / 100;
+  const newTime = percent * audioBuffer.duration;
+  // Restart playback from newTime
+  stopPlayback();
+  startPlayback(newTime);
+  startPlaybackTimestamp(newTime);
+  pauseTime = newTime;
+  scrubberIsDragging = false;
+});
 let isPlaying = false;
 let isPaused = false;
 let audioEnded = false;
@@ -319,7 +361,14 @@ function startPlayback(fromOffset = 0) {
       }
     } else {
       deltaInfoUI.innerText = amplitude;
-      currentLat += speed * 2;
+      currentLat += speed;
+    }
+
+    // Update scrubber position if not dragging
+    if (!scrubberIsDragging && audioBuffer && source && audioCtx) {
+      let elapsed = audioCtx.currentTime - startTime;
+      let percent = Math.max(0, Math.min(1, elapsed / audioBuffer.duration));
+      scrubber.value = (percent * 100).toString();
     }
 
     // console.log(
@@ -355,45 +404,49 @@ function startPlayback(fromOffset = 0) {
     // Stop the timer
     stopPlaybackTimestamp();
 
-    // Show credit overlay
+    // Show credit overlay (always on top, robust blinking, not blocked)
     let credit = document.getElementById('credit-overlay');
-    if (!credit) {
-      credit = document.createElement('div');
-      credit.id = 'credit-overlay';
-      credit.style.position = 'fixed';
-      credit.style.bottom = '10%';
-      credit.style.left = '50%';
-      credit.style.transform = 'translateX(-50%)';
-      credit.style.zIndex = '10001';
-      credit.style.display = 'flex';
-      credit.style.flexDirection = 'column';
-      credit.style.alignItems = 'center';
-      credit.style.justifyContent = 'center';
-      credit.style.pointerEvents = 'auto';
-      credit.style.userSelect = 'none';
-      credit.style.cursor = 'pointer';
-      credit.innerHTML = `
-        <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
-        <span style="font-size:2.2rem;font-weight:700;line-height:1.2;">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
-      `;
-      document.body.appendChild(credit);
-      // Blinking effect
-      let blink = true;
-      let blinkInterval = setInterval(() => {
-        if (!credit) return;
-        credit.style.opacity = blink ? '1' : '0.2';
-        blink = !blink;
-      }, 600);
-      // Hide on hover
-      credit.addEventListener('mouseenter', () => {
-        credit.style.display = 'none';
-      });
-      credit.addEventListener('mouseleave', () => {
-        credit.style.display = 'flex';
-      });
-      // Remove interval if overlay is removed
-      credit._cleanup = () => clearInterval(blinkInterval);
+    if (credit) {
+      credit.remove();
     }
+    credit = document.createElement('div');
+    credit.id = 'credit-overlay';
+    credit.style.position = 'fixed';
+    credit.style.bottom = '10%';
+    credit.style.left = '50%';
+    credit.style.transform = 'translateX(-50%)';
+    credit.style.zIndex = '2147483647'; // max z-index
+    credit.style.display = 'flex';
+    credit.style.flexDirection = 'column';
+    credit.style.alignItems = 'center';
+    credit.style.justifyContent = 'center';
+    credit.style.pointerEvents = 'auto';
+    credit.style.userSelect = 'none';
+    credit.style.cursor = 'pointer';
+    credit.innerHTML = `
+      <span style=\"font-size:1.1rem;opacity:0.7;letter-spacing:1px;\">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
+      <span style=\"font-size:2.2rem;font-weight:700;line-height:1.2;\">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
+    `;
+    document.body.appendChild(credit);
+    // Robust blinking effect
+    let blink = true;
+    let blinkInterval = setInterval(() => {
+      if (!document.body.contains(credit)) {
+        clearInterval(blinkInterval);
+        return;
+      }
+      credit.style.opacity = blink ? '1' : '0.2';
+      blink = !blink;
+    }, 600);
+    // Hide on hover, show on mouseleave
+    credit.addEventListener('mouseenter', () => {
+      credit.style.display = 'none';
+    });
+    credit.addEventListener('mouseleave', () => {
+      credit.style.display = 'flex';
+    });
+    // Remove interval if overlay is removed
+    credit._cleanup = () => clearInterval(blinkInterval);
   };
 }
 
