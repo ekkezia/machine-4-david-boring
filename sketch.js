@@ -27,7 +27,6 @@ function handleAudioEnded() {
   stopPlaybackTimestamp();
 
   // Show the loadingDiv again, but with credit text and blinking
-  let loadingDiv = document.getElementById('audio-loading');
   if (loadingDiv) loadingDiv.remove();
   loadingDiv = document.createElement('div');
   loadingDiv.id = 'audio-loading';
