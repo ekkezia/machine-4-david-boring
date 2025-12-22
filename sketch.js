@@ -99,11 +99,12 @@ const roomInputContainer = document.getElementById('room-input-container');
 const smoothEl = document.getElementById('gc-smooth');
 
 // Create loading overlay
+
 let loadingDiv;
 window.addEventListener('DOMContentLoaded', () => {
+  // Create and animate loadingDiv for intro
   loadingDiv = document.createElement('div');
   loadingDiv.id = 'audio-loading';
-  loadingDiv.textContent = 'MACHINE#4';
   loadingDiv.style.position = 'fixed';
   loadingDiv.style.top = '0';
   loadingDiv.style.left = '0';
@@ -119,6 +120,110 @@ window.addEventListener('DOMContentLoaded', () => {
   loadingDiv.style.backdropFilter = 'blur(16px)';
   loadingDiv.style.filter = 'blur(4px)';
   document.body.appendChild(loadingDiv);
+  // Blinking animation for intro
+  const texts = [
+    { text: 'MACHINE#4', fontSize: '6rem' },
+    { text: 'DAVID', fontSize: '12rem' },
+    { text: 'BORING', fontSize: '12rem' },
+  ];
+  let textCount = 0;
+  if (window._introBlinkInterval) clearInterval(window._introBlinkInterval);
+  window._introBlinkInterval = setInterval(() => {
+    textCount++;
+    const entry = texts[textCount % texts.length];
+    loadingDiv.textContent = entry.text;
+    loadingDiv.style.fontSize = entry.fontSize;
+  }, 100);
+
+  // --- Cesium and rest of DOMContentLoaded logic below ---
+  Cesium.Ion.defaultAccessToken =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmZTU5NDc0ZC1hNDlkLTQ3MWUtYjI3Yi0xZWFjNDE2NTlhZWUiLCJpZCI6MzMwNzkzLCJpYXQiOjE3NTQ5MDY4MDF9.O3HwFCWurGQOrDKbLml-h6lQgfPZ8_1rzC-KIvUDgFg';
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    terrain: Cesium.Terrain.fromWorldTerrain(),
+    animation: false,
+    baseLayerPicker: false,
+    fullscreenButton: false,
+    geocoder: false,
+    homeButton: false,
+    infoBox: false,
+    sceneModePicker: false,
+    selectionIndicator: false,
+    timeline: false,
+    navigationHelpButton: false,
+    vrButton: false,
+  });
+  viewer.scene.globe.depthTestAgainstTerrain = true;
+
+  // ensure camera can see point
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, height),
+    orientation: {
+      heading: 0, // always north
+      pitch: Cesium.Math.toRadians(-15),
+      roll: 0,
+    },
+  });
+
+  // create moving point
+  movingPoint = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, height),
+    // point: { pixelSize: 10, color: Cesium.Color.RED },
+  });
+
+  // preload area around
+  // --- Preload tiles around the current location (≈1 km radius) ---
+  async function preloadLocalArea(lat, lon, radiusDeg = 0.01) {
+    const steps = [-radiusDeg, 0, radiusDeg];
+    for (const dx of steps) {
+      for (const dy of steps) {
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(
+            lon + dx,
+            lat + dy,
+            height,
+          ),
+        });
+        // Wait one frame so Cesium requests the new tiles
+        viewer.scene.requestRender();
+        await new Promise((r) => setTimeout(r, 150)); // 150ms delay to let tiles queue
+      }
+    }
+
+    // Return to the original position
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(
+        currentLon,
+        currentLat,
+        height,
+      ),
+      orientation: {
+        heading: 0, // always north
+        pitch: Cesium.Math.toRadians(-15),
+        roll: 0,
+      },
+    });
+
+    console.log('✅ Preloaded local area tiles');
+  }
+
+  preloadLocalArea(currentLat, currentLon, 0.01).then(() => {
+    console.log('Local area ready — starting playback');
+    mapReady = true;
+
+    setTimeout(() => {
+      tryStartExperience();
+    }, 1000);
+  });
+
+  viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
+
+  loadAudio('/audio.wav').then(() => {
+    audioReady = true;
+
+    setTimeout(() => {
+      tryStartExperience();
+    }, 1000);
+  });
 });
 
 // currentLon & currentLat is in interaction.js
@@ -981,28 +1086,7 @@ function hideRoomCodePanel() {
   }, 700);
 }
 
-// --- BLINKING ---
-// Text animation
-const texts = [
-  { text: 'MACHINE#4', fontSize: '6rem' },
-  { text: 'DAVID', fontSize: '12rem' },
-  { text: 'BORING', fontSize: '12rem' },
-];
-let textInterval;
-let textCount = 0;
-textInterval = setInterval(() => {
-  textCount++;
-  if (loadingDiv) {
-    const entry = texts[textCount % texts.length];
-    if (typeof entry === 'string') {
-      loadingDiv.textContent = entry;
-      loadingDiv.style.fontSize = '12rem';
-    } else {
-      loadingDiv.textContent = entry.text;
-      loadingDiv.style.fontSize = entry.fontSize;
-    }
-  }
-}, 100);
+// (blinking animation now handled in DOMContentLoaded for loadingDiv)
 
 // Webcam
 // === BLINK DETECTION WITH MEDIAPIPE ===
