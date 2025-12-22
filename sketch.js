@@ -926,6 +926,18 @@ guestBtn.addEventListener('click', () => {
   // Enable playback controls
   playBtn.style.pointerEvents = 'auto';
   pauseBtn.style.pointerEvents = 'auto';
+
+  // Immediately start playback in guest mode
+  if (typeof startPlayback === 'function') {
+    playBtn.textContent = 'PAUSE';
+    startPlayback(0);
+    startPlaybackTimestamp(0);
+    isPlaying = true;
+    isPaused = false;
+    audioEnded = false;
+    document.dispatchEvent(new CustomEvent('play-clicked'));
+    showPauseOnHover();
+  }
 });
 
 // Space bar and Fullscreen listener
