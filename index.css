@@ -1,3 +1,8 @@
+/* Make all links white with no underline */
+a, a:visited, a:active {
+  color: #fff !important;
+  text-decoration: none !important;
+}
 @font-face {
         font-family: 'Wallpoet';
         src: url('https://fonts.gstatic.com/s/wallpoet/v16/f0X10em2_8RnXVVdUObp58Q.woff2')
