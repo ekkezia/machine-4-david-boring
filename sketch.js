@@ -375,6 +375,10 @@ function startPlayback(fromOffset = 0) {
     stopPlaybackTimestamp();
     if (playbackTimestamp) playbackTimestamp.style.display = 'none';
 
+    // Hide the map when song finishes
+    const cesiumContainer = document.getElementById('cesiumContainer');
+    if (cesiumContainer) cesiumContainer.style.display = 'none';
+
     // Show credit overlay
     let credit = document.getElementById('credit-overlay');
     if (!credit) {
@@ -429,24 +433,6 @@ function startPlayback(fromOffset = 0) {
       restartBtn.style.bottom = '30px';
       restartBtn.style.transform = 'translateX(-50%)';
       restartBtn.style.zIndex = 10001;
-      restartBtn.style.fontFamily = 'Wallpoet, sans-serif';
-      restartBtn.style.fontSize = '1.2rem';
-      restartBtn.style.padding = '12px 32px';
-      restartBtn.style.background = '#fff';
-      restartBtn.style.color = '#000';
-      restartBtn.style.border = 'none';
-      restartBtn.style.borderRadius = '8px';
-      restartBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-      restartBtn.style.cursor = 'pointer';
-      restartBtn.style.transition = 'background 0.2s, color 0.2s';
-      restartBtn.addEventListener('mouseenter', () => {
-        restartBtn.style.background = '#000';
-        restartBtn.style.color = '#fff';
-      });
-      restartBtn.addEventListener('mouseleave', () => {
-        restartBtn.style.background = '#fff';
-        restartBtn.style.color = '#000';
-      });
       restartBtn.onclick = () => {
         // Remove credit overlay
         if (credit && credit.parentNode) {
@@ -465,6 +451,9 @@ function startPlayback(fromOffset = 0) {
           pauseBtn.style.pointerEvents = 'auto';
         }
         if (playbackTimestamp) playbackTimestamp.style.display = 'flex';
+        // Show the map again
+        const cesiumContainer = document.getElementById('cesiumContainer');
+        if (cesiumContainer) cesiumContainer.style.display = '';
         // Restart audio
         audioEnded = false;
         startPlayback(0);
@@ -814,10 +803,12 @@ function startPlaybackTimestamp(offset = 0) {
         credit.style.justifyContent = 'center';
         credit.style.fontSize = '6rem';
         credit.style.zIndex = '999';
-        credit.style.backdropFilter = 'blur(16px)';
-        credit.style.filter = 'blur(4px)';
+        credit.style.backdropFilter = 'blur(20px)';
+        credit.style.filter = 'blur(2px)';
         credit.style.userSelect = 'none';
         credit.style.cursor = 'pointer';
+        credit.style.display = 'flex';
+        credit.style.flexDirection = 'flex-col';
         credit.innerHTML = `
           <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;text-align:center;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
           <span style="font-size:2.2rem;font-weight:700;line-height:1.2;text-align:center;">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
@@ -828,7 +819,7 @@ function startPlaybackTimestamp(offset = 0) {
           if (!credit) return;
           credit.style.opacity = blink ? '1' : '0.2';
           blink = !blink;
-        }, 600);
+        }, 500);
         // Hide on hover
         credit.addEventListener('mouseenter', () => {
           credit.style.display = 'none';
