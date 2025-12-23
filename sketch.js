@@ -258,31 +258,31 @@ let audioEnded = false;
 let restartBtn;
 const DEBUG = true; // Set to false to hide scrubber
 let scrubber;
-  // Debug-only scrubber
-  if (DEBUG) {
-    scrubber = document.createElement('input');
-    scrubber.type = 'range';
-    scrubber.min = 0;
-    scrubber.max = 100;
-    scrubber.value = 0;
-    scrubber.step = 0.01;
-    scrubber.style.position = 'fixed';
-    scrubber.style.left = '50%';
-    scrubber.style.bottom = '80px';
-    scrubber.style.transform = 'translateX(-50%)';
-    scrubber.style.width = '60vw';
-    scrubber.style.zIndex = 10001;
-    document.body.appendChild(scrubber);
-    scrubber.addEventListener('input', (e) => {
-      if (audioBuffer && audioCtx) {
-        const percent = parseFloat(scrubber.value) / 100;
-        const seekTime = percent * audioBuffer.duration;
-        stopPlayback();
-        startPlayback(seekTime);
-        startPlaybackTimestamp(seekTime);
-      }
-    });
-  }
+// Debug-only scrubber
+if (DEBUG) {
+  scrubber = document.createElement('input');
+  scrubber.type = 'range';
+  scrubber.min = 0;
+  scrubber.max = 100;
+  scrubber.value = 0;
+  scrubber.step = 0.01;
+  scrubber.style.position = 'fixed';
+  scrubber.style.left = '50%';
+  scrubber.style.bottom = '80px';
+  scrubber.style.transform = 'translateX(-50%)';
+  scrubber.style.width = '60vw';
+  scrubber.style.zIndex = 10001;
+  document.body.appendChild(scrubber);
+  scrubber.addEventListener('input', (e) => {
+    if (audioBuffer && audioCtx) {
+      const percent = parseFloat(scrubber.value) / 100;
+      const seekTime = percent * audioBuffer.duration;
+      stopPlayback();
+      startPlayback(seekTime);
+      startPlaybackTimestamp(seekTime);
+    }
+  });
+}
 
 function startPlayback(fromOffset = 0) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -474,7 +474,6 @@ function startPlayback(fromOffset = 0) {
     } else {
       restartBtn.style.display = 'block';
     }
-  };
   };
 }
 
