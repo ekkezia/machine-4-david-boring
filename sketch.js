@@ -256,6 +256,33 @@ let isPlaying = false;
 let isPaused = false;
 let audioEnded = false;
 let restartBtn;
+const DEBUG = true; // Set to false to hide scrubber
+let scrubber;
+  // Debug-only scrubber
+  if (DEBUG) {
+    scrubber = document.createElement('input');
+    scrubber.type = 'range';
+    scrubber.min = 0;
+    scrubber.max = 100;
+    scrubber.value = 0;
+    scrubber.step = 0.01;
+    scrubber.style.position = 'fixed';
+    scrubber.style.left = '50%';
+    scrubber.style.bottom = '80px';
+    scrubber.style.transform = 'translateX(-50%)';
+    scrubber.style.width = '60vw';
+    scrubber.style.zIndex = 10001;
+    document.body.appendChild(scrubber);
+    scrubber.addEventListener('input', (e) => {
+      if (audioBuffer && audioCtx) {
+        const percent = parseFloat(scrubber.value) / 100;
+        const seekTime = percent * audioBuffer.duration;
+        stopPlayback();
+        startPlayback(seekTime);
+        startPlaybackTimestamp(seekTime);
+      }
+    });
+  }
 
 function startPlayback(fromOffset = 0) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -335,25 +362,18 @@ function startPlayback(fromOffset = 0) {
     audioEnded = true;
     if (isPaused) return;
     pauseTime = 0; // reset
-    // Change playBtn to restart mode
+    // Hide play/pause buttons
     if (playBtn) {
-      playBtn.textContent = 'RESTART';
-      playBtn.style.pointerEvents = 'auto';
-      playBtn.onclick = function (e) {
-        e.preventDefault();
-        audioEnded = false;
-        playBtn.textContent = 'PAUSE';
-        startPlayback(0);
-        startPlaybackTimestamp(0);
-        // Remove credit overlay if present
-        const credit = document.getElementById('credit-overlay');
-        if (credit) credit.remove();
-      };
+      playBtn.style.opacity = '0';
+      playBtn.style.pointerEvents = 'none';
     }
-    // Hide pauseBtn
-    if (pauseBtn) pauseBtn.style.opacity = '0';
-    // Stop the timer
+    if (pauseBtn) {
+      pauseBtn.style.opacity = '0';
+      pauseBtn.style.pointerEvents = 'none';
+    }
+    // Stop the timer and hide it
     stopPlaybackTimestamp();
+    if (playbackTimestamp) playbackTimestamp.style.display = 'none';
 
     // Show credit overlay
     let credit = document.getElementById('credit-overlay');
@@ -361,22 +381,25 @@ function startPlayback(fromOffset = 0) {
       credit = document.createElement('div');
       credit.id = 'credit-overlay';
       credit.style.position = 'fixed';
-      credit.style.bottom = '10%';
-      credit.style.left = '50%';
-      credit.style.transform = 'translateX(-50%)';
-      credit.style.zIndex = '10001';
+      credit.style.top = '0';
+      credit.style.left = '0';
+      credit.style.width = '100vw';
+      credit.style.height = '100vh';
+      credit.style.background = 'rgba(0,0,0,0.4)';
+      credit.style.color = 'white';
       credit.style.display = 'flex';
-      credit.style.flexDirection = 'column';
       credit.style.alignItems = 'center';
       credit.style.justifyContent = 'center';
-      credit.style.pointerEvents = 'auto';
+      credit.style.fontSize = '6rem';
+      credit.style.zIndex = '999';
+      credit.style.backdropFilter = 'blur(16px)';
+      credit.style.filter = 'blur(4px)';
       credit.style.userSelect = 'none';
       credit.style.cursor = 'pointer';
       credit.innerHTML = `
-        <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
-        <span style="font-size:2.2rem;font-weight:700;line-height:1.2;">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
+        <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;text-align:center;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
+        <span style="font-size:2.2rem;font-weight:700;line-height:1.2;text-align:center;">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
       `;
-      document.body.appendChild(credit);
       // Blinking effect
       let blink = true;
       let blinkInterval = setInterval(() => {
@@ -393,7 +416,65 @@ function startPlayback(fromOffset = 0) {
       });
       // Remove interval if overlay is removed
       credit._cleanup = () => clearInterval(blinkInterval);
+      document.body.appendChild(credit);
     }
+
+    // Show restart button styled like AUTOPILOT, replace timer
+    if (!restartBtn) {
+      restartBtn = document.createElement('button');
+      restartBtn.id = 'restartBtn';
+      restartBtn.textContent = 'RESTART';
+      restartBtn.style.position = 'fixed';
+      restartBtn.style.left = '50%';
+      restartBtn.style.bottom = '30px';
+      restartBtn.style.transform = 'translateX(-50%)';
+      restartBtn.style.zIndex = 10001;
+      restartBtn.style.fontFamily = 'Wallpoet, sans-serif';
+      restartBtn.style.fontSize = '1.2rem';
+      restartBtn.style.padding = '12px 32px';
+      restartBtn.style.background = '#fff';
+      restartBtn.style.color = '#000';
+      restartBtn.style.border = 'none';
+      restartBtn.style.borderRadius = '8px';
+      restartBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+      restartBtn.style.cursor = 'pointer';
+      restartBtn.style.transition = 'background 0.2s, color 0.2s';
+      restartBtn.addEventListener('mouseenter', () => {
+        restartBtn.style.background = '#000';
+        restartBtn.style.color = '#fff';
+      });
+      restartBtn.addEventListener('mouseleave', () => {
+        restartBtn.style.background = '#fff';
+        restartBtn.style.color = '#000';
+      });
+      restartBtn.onclick = () => {
+        // Remove credit overlay
+        if (credit && credit.parentNode) {
+          if (credit._cleanup) credit._cleanup();
+          credit.parentNode.removeChild(credit);
+        }
+        // Hide restart button
+        restartBtn.style.display = 'none';
+        // Show play/pause and timer again
+        if (playBtn) {
+          playBtn.style.opacity = '1';
+          playBtn.style.pointerEvents = 'auto';
+        }
+        if (pauseBtn) {
+          pauseBtn.style.opacity = '1';
+          pauseBtn.style.pointerEvents = 'auto';
+        }
+        if (playbackTimestamp) playbackTimestamp.style.display = 'flex';
+        // Restart audio
+        audioEnded = false;
+        startPlayback(0);
+        startPlaybackTimestamp(0);
+      };
+      document.body.appendChild(restartBtn);
+    } else {
+      restartBtn.style.display = 'block';
+    }
+  };
   };
 }
 
@@ -843,6 +924,18 @@ guestBtn.addEventListener('click', () => {
   // Enable playback controls
   playBtn.style.pointerEvents = 'auto';
   pauseBtn.style.pointerEvents = 'auto';
+
+  // Immediately start playback in guest mode
+  if (typeof startPlayback === 'function') {
+    playBtn.textContent = 'PAUSE';
+    startPlayback(0);
+    startPlaybackTimestamp(0);
+    isPlaying = true;
+    isPaused = false;
+    audioEnded = false;
+    document.dispatchEvent(new CustomEvent('play-clicked'));
+    showPauseOnHover();
+  }
 });
 
 // Space bar and Fullscreen listener
@@ -902,9 +995,9 @@ function hideRoomCodePanel() {
 // --- BLINKING ---
 // Text animation
 const texts = [
-  { text: 'MACHINE#4', fontSize: '6rem' },
-  { text: 'DAVID', fontSize: '12rem' },
-  { text: 'BORING', fontSize: '12rem' },
+  { text: 'MACHINE#4', fontSize: '8rem' },
+  { text: 'DAVID', fontSize: '10rem' },
+  { text: 'BORING', fontSize: '10rem' },
 ];
 let textInterval;
 let textCount = 0;
@@ -923,84 +1016,3 @@ textInterval = setInterval(() => {
 }, 100);
 
 // Webcam
-// === BLINK DETECTION WITH MEDIAPIPE ===
-const videoElement = document.createElement('video');
-videoElement.autoplay = true;
-videoElement.style.display = 'none';
-document.body.appendChild(videoElement);
-
-let lastBlinkTime = 0;
-const blinkThreshold = 0.25; // smaller = more sensitive
-
-const faceMesh = new FaceMesh({
-  locateFile: (file) =>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-});
-
-faceMesh.setOptions({
-  maxNumFaces: 1,
-  refineLandmarks: true, // gives iris landmarks
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5,
-});
-
-faceMesh.onResults(onResults);
-
-const camera = new Camera(videoElement, {
-  onFrame: async () => await faceMesh.send({ image: videoElement }),
-  width: 320,
-  height: 240,
-});
-camera.start();
-
-function onResults(results) {
-  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0)
-    return;
-
-  const landmarks = results.multiFaceLandmarks[0];
-
-  // Left eye: 159 = top, 145 = bottom
-  const leftTop = landmarks[159];
-  const leftBottom = landmarks[145];
-  const leftDist = Math.hypot(
-    leftTop.x - leftBottom.x,
-    leftTop.y - leftBottom.y,
-  );
-
-  // Right eye: 386 = top, 374 = bottom
-  const rightTop = landmarks[386];
-  const rightBottom = landmarks[374];
-  const rightDist = Math.hypot(
-    rightTop.x - rightBottom.x,
-    rightTop.y - rightBottom.y,
-  );
-
-  // approximate eye width
-  const leftWidth = Math.hypot(
-    landmarks[33].x - landmarks[133].x,
-    landmarks[33].y - landmarks[133].y,
-  );
-  const rightWidth = Math.hypot(
-    landmarks[263].x - landmarks[362].x,
-    landmarks[263].y - landmarks[362].y,
-  );
-
-  const ratio = (leftDist / leftWidth + rightDist / rightWidth) / 2;
-
-  if (ratio < blinkThreshold && Date.now() - lastBlinkTime > 500) {
-    lastBlinkTime = Date.now();
-    // console.log('Blink detected!');
-    if (loadingDiv) {
-      loadingDiv.style.background = 'rgba(0,0,0,0)';
-      loadingDiv.style.color = 'white';
-    }
-
-    // Optional: fade back after 200ms
-    setTimeout(() => {
-      if (loadingDiv) {
-        loadingDiv.style.background = 'rgba(0,0,0,1)';
-        loadingDiv.style.color = 'black';
-      }
-    }, 200);
-  }
-}
