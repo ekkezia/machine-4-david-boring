@@ -483,7 +483,15 @@ function pausePlayback() {
   clearInterval(interval);
   pauseTime = audioCtx.currentTime - startTime; // save current position
   isPlaying = false;
-  if (playBtn) playBtn.textContent = 'PLAY';
+  if (playBtn) {
+    playBtn.textContent = 'PLAY';
+    playBtn.style.opacity = '1';
+    playBtn.style.pointerEvents = 'auto';
+  }
+  if (pauseBtn) {
+    pauseBtn.style.opacity = '0';
+    pauseBtn.style.pointerEvents = 'none';
+  }
 }
 
 function togglePlayback() {
@@ -752,6 +760,14 @@ document.body.appendChild(playbackTimestamp);
 let playbackInterval = null;
 let playbackStartTime = null;
 
+// Update scrubber position to follow audio progress
+function updateScrubberProgress(currentTime) {
+  if (DEBUG && scrubber && audioBuffer) {
+    const percent = (currentTime / audioBuffer.duration) * 100;
+    scrubber.value = percent;
+  }
+}
+
 function formatTime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -776,6 +792,120 @@ function startPlaybackTimestamp(offset = 0) {
       elapsed = performance.now() / 1000 - playbackStartTime;
     }
     playbackTimestamp.textContent = formatTime(elapsed);
+    updateScrubberProgress(elapsed);
+    // Show credit overlay if at end
+    if (audioBuffer && elapsed >= audioBuffer.duration && !audioEnded) {
+      audioEnded = true;
+      if (typeof source !== 'undefined') stopPlayback();
+      // Show credit overlay and restart button
+      let credit = document.getElementById('credit-overlay');
+      if (!credit) {
+        credit = document.createElement('div');
+        credit.id = 'credit-overlay';
+        credit.style.position = 'fixed';
+        credit.style.top = '0';
+        credit.style.left = '0';
+        credit.style.width = '100vw';
+        credit.style.height = '100vh';
+        credit.style.background = 'rgba(0,0,0,0.4)';
+        credit.style.color = 'white';
+        credit.style.display = 'flex';
+        credit.style.alignItems = 'center';
+        credit.style.justifyContent = 'center';
+        credit.style.fontSize = '6rem';
+        credit.style.zIndex = '999';
+        credit.style.backdropFilter = 'blur(16px)';
+        credit.style.filter = 'blur(4px)';
+        credit.style.userSelect = 'none';
+        credit.style.cursor = 'pointer';
+        credit.innerHTML = `
+          <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;text-align:center;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
+          <span style="font-size:2.2rem;font-weight:700;line-height:1.2;text-align:center;">ELIZABETH KEZIA WIDJAJA<br/>@EKEZIA</span>
+        `;
+        // Blinking effect
+        let blink = true;
+        let blinkInterval = setInterval(() => {
+          if (!credit) return;
+          credit.style.opacity = blink ? '1' : '0.2';
+          blink = !blink;
+        }, 600);
+        // Hide on hover
+        credit.addEventListener('mouseenter', () => {
+          credit.style.display = 'none';
+        });
+        credit.addEventListener('mouseleave', () => {
+          credit.style.display = 'flex';
+        });
+        // Remove interval if overlay is removed
+        credit._cleanup = () => clearInterval(blinkInterval);
+        document.body.appendChild(credit);
+      }
+      // Show restart button styled like AUTOPILOT, replace timer
+      if (!restartBtn) {
+        restartBtn = document.createElement('button');
+        restartBtn.id = 'restartBtn';
+        restartBtn.textContent = 'RESTART';
+        restartBtn.style.position = 'fixed';
+        restartBtn.style.left = '50%';
+        restartBtn.style.bottom = '30px';
+        restartBtn.style.transform = 'translateX(-50%)';
+        restartBtn.style.zIndex = 10001;
+        restartBtn.style.fontFamily = 'Wallpoet, sans-serif';
+        restartBtn.style.fontSize = '1.2rem';
+        restartBtn.style.padding = '12px 32px';
+        restartBtn.style.background = '#fff';
+        restartBtn.style.color = '#000';
+        restartBtn.style.border = 'none';
+        restartBtn.style.borderRadius = '8px';
+        restartBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+        restartBtn.style.cursor = 'pointer';
+        restartBtn.style.transition = 'background 0.2s, color 0.2s';
+        restartBtn.addEventListener('mouseenter', () => {
+          restartBtn.style.background = '#000';
+          restartBtn.style.color = '#fff';
+        });
+        restartBtn.addEventListener('mouseleave', () => {
+          restartBtn.style.background = '#fff';
+          restartBtn.style.color = '#000';
+        });
+        restartBtn.onclick = () => {
+          // Remove credit overlay
+          if (credit && credit.parentNode) {
+            if (credit._cleanup) credit._cleanup();
+            credit.parentNode.removeChild(credit);
+          }
+          // Hide restart button
+          restartBtn.style.display = 'none';
+          // Show play/pause and timer again
+          if (playBtn) {
+            playBtn.style.opacity = '1';
+            playBtn.style.pointerEvents = 'auto';
+          }
+          if (pauseBtn) {
+            pauseBtn.style.opacity = '1';
+            pauseBtn.style.pointerEvents = 'auto';
+          }
+          if (playbackTimestamp) playbackTimestamp.style.display = 'flex';
+          // Restart audio
+          audioEnded = false;
+          startPlayback(0);
+          startPlaybackTimestamp(0);
+        };
+        document.body.appendChild(restartBtn);
+      } else {
+        restartBtn.style.display = 'block';
+      }
+      // Hide play/pause and timer
+      if (playBtn) {
+        playBtn.style.opacity = '0';
+        playBtn.style.pointerEvents = 'none';
+      }
+      if (pauseBtn) {
+        pauseBtn.style.opacity = '0';
+        pauseBtn.style.pointerEvents = 'none';
+      }
+      if (playbackTimestamp) playbackTimestamp.style.display = 'none';
+    }
   }, 500);
 }
 
@@ -995,8 +1125,8 @@ function hideRoomCodePanel() {
 // Text animation
 const texts = [
   { text: 'MACHINE#4', fontSize: '8rem' },
-  { text: 'DAVID', fontSize: '10rem' },
-  { text: 'BORING', fontSize: '10rem' },
+  { text: 'DAVID', fontSize: '8rem' },
+  { text: 'BORING', fontSize: '8rem' },
 ];
 let textInterval;
 let textCount = 0;
@@ -1012,6 +1142,4 @@ textInterval = setInterval(() => {
       loadingDiv.style.fontSize = entry.fontSize;
     }
   }
-}, 100);
-
-// Webcam
+}, 500);
