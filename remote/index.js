@@ -34,7 +34,7 @@ import { isMobile } from '../utils.js';
     existingParagraphs.forEach((el) => gyroDependentEls.push(el));
 
     gyroNotice = document.createElement('p');
-    gyroNotice.innerHTML = `You have decided to use your mobile device as a remote. Gyroscope access is required to use your mobile device as a controller for [MACHINE #4] music video.<br /><br />Tap "Enable Gyro" to continuee.`;
+    gyroNotice.innerHTML = `You have decided to use your mobile device as a remote. Gyroscope access is required to use your mobile device as a controller for [MACHINE #4] music video.<br /><br />Tap "Enable Gyro" to continue.`;
     gyroNotice.style.margin = '0 0 8px 0';
     gyroNotice.style.fontSize = '1.2rem';
     gyroNotice.style.color = '#ffffff';
@@ -195,12 +195,11 @@ import { isMobile } from '../utils.js';
 
   // request permission if needed (for iOS)
   async function enableCompass() {
+    alert('enableCompass called');
     if (gyroEnabled) {
       alert('Gyro already enabled, skipping permission.');
       return true;
     }
-
-    let ok = true;
 
     try {
       if (
@@ -210,12 +209,19 @@ import { isMobile } from '../utils.js';
         alert('Requesting DeviceOrientationEvent permission...');
         ok = (await DeviceOrientationEvent.requestPermission()) === 'granted';
         alert('Permission result: ' + ok);
+
+        return (ok = true);
       } else {
-        alert('No DeviceOrientationEvent.requestPermission; assuming permission not required.');
+        alert(
+          'No DeviceOrientationEvent.requestPermission; assuming permission not required.',
+        );
       }
     } catch (err) {
       ok = false;
-      alert('Compass permission request failed: ' + (err && err.message ? err.message : err));
+      alert(
+        'Compass permission request failed: ' +
+          (err && err.message ? err.message : err),
+      );
     }
 
     if (!ok) {
