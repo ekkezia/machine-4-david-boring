@@ -133,7 +133,7 @@ a, a:visited, a:active {
         transform: translate(-50%, -50%);
         pointer-events: auto;
         font-size: 4rem;
-        color: rgba(255, 255, 255, 1);
+        color: rgba(255, 255, 255, 0.5);
         opacity: 0.5;
         background-color: transparent;
         border: none;

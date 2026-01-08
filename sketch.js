@@ -206,10 +206,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // preload area around
   // --- Preload tiles around the current location (≈1 km radius) ---
-  async function preloadLocalArea(lat, lon, radiusDeg = 0.01) {
-    const steps = [-radiusDeg, 0, radiusDeg];
-    for (const dx of steps) {
-      for (const dy of steps) {
+  // Preload a much larger area with higher density
+  async function preloadLocalArea(lat, lon, radiusDeg = 0.05, gridSteps = 7) {
+    // gridSteps: number of points per axis (odd number, e.g. 7 for -3*step to +3*step)
+    const stepSize = (2 * radiusDeg) / (gridSteps - 1);
+    const offsets = [];
+    for (let i = 0; i < gridSteps; i++) {
+      offsets.push(-radiusDeg + i * stepSize);
+    }
+    for (const dx of offsets) {
+      for (const dy of offsets) {
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromDegrees(
             lon + dx,
@@ -217,9 +223,8 @@ window.addEventListener('DOMContentLoaded', () => {
             height,
           ),
         });
-        // Wait one frame so Cesium requests the new tiles
         viewer.scene.requestRender();
-        await new Promise((r) => setTimeout(r, 150)); // 150ms delay to let tiles queue
+        await new Promise((r) => setTimeout(r, 100)); // shorter delay for more points
       }
     }
 
@@ -237,10 +242,10 @@ window.addEventListener('DOMContentLoaded', () => {
       },
     });
 
-    console.log('✅ Preloaded local area tiles');
+    console.log('✅ Preloaded large area tiles');
   }
 
-  preloadLocalArea(currentLat, currentLon, 0.01).then(() => {
+  preloadLocalArea(currentLat, currentLon, 0.05, 7).then(() => {
     console.log('Local area ready — starting playback');
     mapReady = true;
     checkAllReady();
@@ -889,39 +894,39 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
 
 // UI ELEMENTS & LOGIC
 // redirect to /remote/ if on mobile device — but only if that path exists
-// if (isMobile) {
-//   (async () => {
-//     try {
-//       const remoteIndex = new URL('/remote/index.html', window.location.origin)
-//         .href;
-//       // Try a HEAD request first; some hosts don't allow HEAD so fall back to GET
-//       let ok = false;
-//       try {
-//         const resp = await fetch(remoteIndex, { method: 'HEAD' });
-//         ok = resp && resp.ok;
-//       } catch (headErr) {
-//         try {
-//           const resp2 = await fetch(remoteIndex, { method: 'GET' });
-//           ok = resp2 && resp2.ok;
-//         } catch (getErr) {
-//           ok = false;
-//         }
-//       }
+if (isMobile) {
+  (async () => {
+    try {
+      const remoteIndex = new URL('/remote/index.html', window.location.origin)
+        .href;
+      // Try a HEAD request first; some hosts don't allow HEAD so fall back to GET
+      let ok = false;
+      try {
+        const resp = await fetch(remoteIndex, { method: 'HEAD' });
+        ok = resp && resp.ok;
+      } catch (headErr) {
+        try {
+          const resp2 = await fetch(remoteIndex, { method: 'GET' });
+          ok = resp2 && resp2.ok;
+        } catch (getErr) {
+          ok = false;
+        }
+      }
 
-//       if (ok) {
-//         const currentUrl = new URL(window.location.href);
-//         currentUrl.pathname = '/remote/';
-//         window.location.href = currentUrl.href;
-//       } else {
-//         console.warn(
-//           'Remote path not found; skipping mobile redirect to /remote/',
-//         );
-//       }
-//     } catch (err) {
-//       console.warn('Error checking remote path, skipping redirect', err);
-//     }
-//   })();
-// }
+      if (ok) {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.pathname = '/remote/';
+        window.location.href = currentUrl.href;
+      } else {
+        console.warn(
+          'Remote path not found; skipping mobile redirect to /remote/',
+        );
+      }
+    } catch (err) {
+      console.warn('Error checking remote path, skipping redirect', err);
+    }
+  })();
+}
 
 // UI elements
 // Playback timestamp element
