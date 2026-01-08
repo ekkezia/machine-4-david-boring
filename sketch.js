@@ -1,16 +1,23 @@
-// ...existing code...
 // Map & Audio, Cesium
 
 import { defaultServer } from './config.js';
 import { isMobile } from './utils.js';
+import LYRICS from './lyrics.js';
 
 // --- Cesium Standalone Logic ---
 let viewer, movingPoint;
-let audioCtx, source, analyser, timeDomainData, audioBuffer;
+let audioCtx, source, analyser, timeDomainData, frequencyData, audioBuffer;
 let interval;
 let height = 100;
 let idx = 0;
 let intervalFrame = 100; // ms
+let shadowX = window.innerWidth / 2; // current X position for smooth random walk (start at center)
+let shadowTargetX = window.innerWidth / 2; // target X position for random walk (start at center)
+let shadowY = window.innerHeight / 2; // current Y position for smooth random walk (start at center)
+let shadowTargetY = window.innerHeight / 2; // target Y position for random walk (start at center)
+let shadowMovementEnabled = false; // toggle to enable/disable shadow movement
+let lyricsRanges = null; // computed [{start,end,text}]
+let lastLyricsIndex = -1;
 
 // shared gyro state updated by Socket.IO messages (or device fallback)
 const gyro = { alpha: null, beta: null, gamma: null };
@@ -21,6 +28,7 @@ let socket = null;
 // Loading States
 let audioReady = false;
 let mapReady = false;
+let roomReady = false;
 
 // Modes
 let hasSelectedMode = true;
@@ -68,23 +76,23 @@ ui.style.display = 'flex';
 ui.style.flexDirection = 'column';
 ui.style.justifyContent = 'center';
 ui.style.alignItems = 'center';
-ui.style.zIndex = 99;
-ui.style.background = 'rgba(0,0,0,0.)';
+ui.style.zIndex = 30000;
+ui.style.top = 0;
 ui.style.color = 'white';
-ui.style.fontSize = '16px';
 ui.style.pointerEvents = 'auto'; // panel itself is interactive
-ui.style.opacity = 1;
+ui.style.opacity = 0;
 ui.style.backdropFilter = 'blur(16px)';
+ui.style.filter = 'blur(0.5px)';
 ui.style.textAlign = 'center';
 ui.style.transition =
   'backdrop-filter 0.7s cubic-bezier(.4,0,.2,1), background 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s cubic-bezier(.4,0,.2,1)';
 ui.innerHTML = `
-    <p style="width:400px;">Enter the room code on your mobile device to use it as remote control</p>
+    <p style="width:400px;font-size:1.2rem;">Enter the room code on your mobile device to use it as remote control</p>
 
     <div id="room-input-container" style="display:flex;gap:6px;margin-bottom:6px"></div>
     <input id="gc-room" type="hidden" />
-    <p>Don't have a mobile device?<br/ ></p>
-    <div style="display:flex;gap:6px;margin-bottom:6px"><button id="gc-connect">AUTOPILOT</button></div>
+    <p style="font-size:1.2rem;">Don't have a mobile device?</p>
+    <button id="gc-connect" style="box-shadow: 0 0 50px 0 rgba(255, 255, 255, 0.5);transform: translateY(-16px);">AUTOPILOT</button>
   `;
 // <div id='gc-status' style='margin-top:6px;font-size:12px;opacity:0.9'>
 //   Disconnected
@@ -155,6 +163,31 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   viewer.scene.globe.depthTestAgainstTerrain = true;
 
+  // Remove any hover overlay if present (should not exist)
+  const hoverOverlay = document.getElementById('cesium-hover-overlay');
+  if (hoverOverlay) hoverOverlay.remove();
+
+  // --- Show feathered oval mask on map from the beginning ---
+  function updateMapMask() {
+    const cesiumContainer = document.getElementById('cesiumContainer');
+    if (!cesiumContainer) return;
+    const canvas = cesiumContainer.querySelector('canvas');
+    if (!canvas) return;
+    const svgMask = "url('/public/mask.svg')";
+    cesiumContainer.style.webkitMaskImage = svgMask;
+    cesiumContainer.style.maskImage = svgMask;
+    cesiumContainer.style.webkitMaskRepeat = 'no-repeat';
+    cesiumContainer.style.maskRepeat = 'no-repeat';
+    cesiumContainer.style.webkitMaskSize = '80% 50%';
+    cesiumContainer.style.maskSize = '80% 50%';
+    cesiumContainer.style.objectFit = 'cover'; // Ensure mask covers and centers
+    cesiumContainer.style.webkitMaskPosition = 'center';
+    cesiumContainer.style.maskPosition = 'center';
+  }
+  // Show mask on load
+  updateMapMask();
+  // Update mask on resize
+  window.addEventListener('resize', updateMapMask);
   // ensure camera can see point
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(currentLon, currentLat, height),
@@ -210,6 +243,7 @@ window.addEventListener('DOMContentLoaded', () => {
   preloadLocalArea(currentLat, currentLon, 0.01).then(() => {
     console.log('Local area ready — starting playback');
     mapReady = true;
+    checkAllReady();
 
     setTimeout(() => {
       tryStartExperience();
@@ -218,20 +252,30 @@ window.addEventListener('DOMContentLoaded', () => {
 
   viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
-  loadAudio('/audio.wav').then(() => {
-    audioReady = true;
-
+  loadAudio('/public/audio.wav').then(() => {
     setTimeout(() => {
       tryStartExperience();
     }, 1000);
   });
 });
 
+function checkAllReady() {
+  if (audioReady && mapReady && roomReady) {
+    ui.style.opacity = 1;
+  }
+}
+
 function tryStartExperience() {
   if (audioReady && mapReady) {
     const loadingDiv = document.getElementById('audio-loading');
-    if (loadingDiv) loadingDiv.remove();
-    showPlayOnHover(); // Handler is now attached only once after playBtn is defined
+    if (loadingDiv) {
+      loadingDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+      loadingDiv.style.opacity = '0';
+      setTimeout(() => {
+        loadingDiv.remove();
+      }, 700);
+    }
+    setInfoUIVisibility(true); // Show info UIs when music starts
   }
 }
 
@@ -243,15 +287,33 @@ async function loadAudio(url) {
   const arrayBuffer = await response.arrayBuffer();
   console.log('🎤 Audio loaded');
   audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  audioReady = true;
+  checkAllReady();
 }
 
 let startTime = 0; // when the playback started
 let pauseTime = 0; // how many seconds have already played
 const playBtn = document.getElementById('playBtn');
-playBtn.style.pointerEvents = 'none'; // disable clicks globally
+playBtn.style.pointerEvents = 'auto';
+playBtn.style.zIndex = '20001';
+playBtn.style.opacity = '0';
+playBtn.onmouseenter = () => {
+  if (!isPlaying) playBtn.style.opacity = '1';
+};
+playBtn.onmouseleave = () => {
+  if (!isPlaying) playBtn.style.opacity = '0';
+};
 const playbackTimestamp = document.getElementById('playback-timestamp');
 const pauseBtn = document.getElementById('pauseBtn');
-pauseBtn.style.pointerEvents = 'none'; // disable clicks globally
+pauseBtn.style.pointerEvents = 'auto';
+pauseBtn.style.zIndex = '20001';
+pauseBtn.style.opacity = '0';
+pauseBtn.onmouseenter = () => {
+  if (isPlaying) pauseBtn.style.opacity = '1';
+};
+pauseBtn.onmouseleave = () => {
+  if (isPlaying) pauseBtn.style.opacity = '0';
+};
 const controls = document.getElementsByClassName('control-hover-area');
 let isPlaying = false;
 let isPaused = false;
@@ -302,6 +364,7 @@ function startPlayback(fromOffset = 0) {
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 2048;
   timeDomainData = new Float32Array(analyser.fftSize);
+  frequencyData = new Float32Array(analyser.frequencyBinCount);
 
   source.connect(analyser);
   analyser.connect(audioCtx.destination);
@@ -313,10 +376,55 @@ function startPlayback(fromOffset = 0) {
   // fixed direction (north)
   let directionAngle = 0; // 0 radians = north
 
+  // Build lyrics ranges once (compute end from next start, fallback to duration)
+  if (!lyricsRanges) {
+    const sorted = [...LYRICS].sort((a, b) => a.start - b.start);
+    const duration = audioBuffer ? audioBuffer.duration : 1e9;
+    lyricsRanges = sorted.map((entry, i) => {
+      const next = sorted[i + 1];
+      const end = next ? next.start - 0.05 : duration;
+      return { start: entry.start, end, text: entry.text };
+    });
+  }
+
+  // Ensure lyrics container exists and is styled once (outer container, full screen)
+  let lyricsContainer = document.getElementById('lyrics-container');
+  if (!lyricsContainer) {
+    lyricsContainer = document.createElement('div');
+    lyricsContainer.id = 'lyrics-container';
+    lyricsContainer.style.zIndex = '1'; // behind map
+    lyricsContainer.style.position = 'fixed';
+    lyricsContainer.style.left = '0';
+    lyricsContainer.style.top = '0';
+    lyricsContainer.style.width = '100vw';
+    lyricsContainer.style.height = '100vh';
+    lyricsContainer.style.pointerEvents = 'none';
+    lyricsContainer.style.overflow = 'hidden';
+    lyricsContainer.style.display = 'flex';
+    lyricsContainer.style.justifyContent = 'center';
+    lyricsContainer.style.alignItems = 'center';
+    lyricsContainer.style.flexDirection = 'column';
+    document.body.appendChild(lyricsContainer);
+  }
+
+  // Create lyrics shadow overlay (same technique as map shadow)
+  // Remove lyrics shadow overlay logic. Instead, mask the map container.
+  const cesiumContainer = document.getElementById('cesiumContainer');
+  if (cesiumContainer) {
+    cesiumContainer.style.position = 'fixed';
+    cesiumContainer.style.top = '0';
+    cesiumContainer.style.left = '0';
+    cesiumContainer.style.width = '100vw';
+    cesiumContainer.style.height = '100vh';
+    cesiumContainer.style.zIndex = '10'; // above lyrics
+    cesiumContainer.style.pointerEvents = '';
+  }
+
   interval = setInterval(() => {
     // count speed based on audio amplitude
     // --- Guest Mode: move map along audio ---
     analyser.getFloatTimeDomainData(timeDomainData);
+    analyser.getFloatFrequencyData(frequencyData);
 
     // Compute average amplitude to control speed
     let sum = 0;
@@ -324,6 +432,30 @@ function startPlayback(fromOffset = 0) {
       sum += Math.abs(timeDomainData[i]);
     }
     const amplitude = sum / timeDomainData.length;
+
+    // animate the mask position using smooth random walk for both X and Y
+    if (shadowMovementEnabled) {
+      if (Math.abs(shadowX - shadowTargetX) < 1 || Math.random() < 0.02) {
+        shadowTargetX = Math.random() * window.innerWidth;
+      }
+      shadowX += (shadowTargetX - shadowX) * 0.08;
+      if (Math.abs(shadowY - shadowTargetY) < 1 || Math.random() < 0.02) {
+        shadowTargetY = Math.random() * window.innerHeight;
+      }
+      shadowY += (shadowTargetY - shadowY) * 0.08;
+    }
+    // Move the mask image within the canvas
+    if (cesiumContainer) {
+      const canvas = cesiumContainer.querySelector('canvas');
+      if (canvas) {
+        // Animate mask position using percentage values for CSS mask
+        const percentX = Math.round((shadowX / window.innerWidth) * 100);
+        const percentY = Math.round((shadowY / window.innerHeight) * 100);
+        const maskPos = `${percentX}% ${percentY}%`;
+        cesiumContainer.style.webkitMaskPosition = maskPos;
+        cesiumContainer.style.maskPosition = maskPos;
+      }
+    }
 
     let speed = amplitude * 0.001; // tweak as needed
 
@@ -352,6 +484,56 @@ function startPlayback(fromOffset = 0) {
             roll: 0,
           },
         });
+      }
+
+      // Show lyrics (active line only)
+      if (lyricsContainer && lyricsRanges) {
+        const elapsed = audioCtx.currentTime - startTime;
+        // Find active index (linear scan is fine for small list)
+        let activeIndex = -1;
+        for (let i = 0; i < lyricsRanges.length; i++) {
+          const r = lyricsRanges[i];
+          if (elapsed >= r.start && elapsed < r.end) {
+            activeIndex = i;
+            break;
+          }
+        }
+        if (activeIndex !== lastLyricsIndex) {
+          lastLyricsIndex = activeIndex;
+          // Always clear container when index changes (including when no lyric is active)
+          lyricsContainer.innerHTML = '';
+          if (activeIndex >= 0) {
+            const text = lyricsRanges[activeIndex].text;
+            const lyricSpan = document.createElement('span');
+            lyricSpan.textContent = text;
+            lyricSpan.style.color = 'white';
+            lyricSpan.style.fontSize = '4rem';
+            lyricSpan.style.fontWeight = 'bold';
+            lyricSpan.style.whiteSpace = 'nowrap';
+            lyricSpan.style.filter = 'blur(2px)';
+            lyricSpan.style.textAlign = 'center';
+            lyricSpan.style.opacity = '0.9';
+            lyricSpan.style.position = 'absolute';
+            // Constrain position so text is always fully visible
+            const margin = 60;
+            lyricsContainer.appendChild(lyricSpan); // temporarily add to measure size
+            const spanRect = lyricSpan.getBoundingClientRect();
+            lyricsContainer.removeChild(lyricSpan);
+            const maxX = window.innerWidth - margin - spanRect.width;
+            const maxY = window.innerHeight - margin - spanRect.height;
+            const minX = margin;
+            const minY = margin;
+            const randX = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+            const randY = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+            lyricSpan.style.left = randX + 'px';
+            lyricSpan.style.top = randY + 'px';
+            lyricsContainer.style.position = 'fixed'; // ensure container is positioned
+            lyricsContainer.style.justifyContent = '';
+            lyricsContainer.style.alignItems = '';
+            lyricsContainer.style.flexDirection = '';
+            lyricsContainer.appendChild(lyricSpan);
+          }
+        }
       }
     } else {
       deltaInfoUI.innerText = amplitude;
@@ -389,49 +571,7 @@ function startPlayback(fromOffset = 0) {
     if (cesiumContainer) cesiumContainer.style.display = 'none';
 
     // Show credit overlay with fade-in and animated blur
-    let credit = document.getElementById('credit-overlay');
-    if (!credit) {
-      credit = document.createElement('div');
-      credit.id = 'credit-overlay';
-      credit.style.position = 'fixed';
-      credit.style.top = '0';
-      credit.style.left = '0';
-      credit.style.width = '100vw';
-      credit.style.height = '100vh';
-      credit.style.background = 'rgba(0,0,0,0.8)';
-      credit.style.color = 'white';
-      credit.style.display = 'flex';
-      credit.style.flexDirection = 'column';
-      credit.style.alignItems = 'center';
-      credit.style.justifyContent = 'center';
-      credit.style.fontSize = '6rem';
-      credit.style.zIndex = '999';
-      credit.style.backdropFilter = 'blur(0px)';
-      credit.style.filter = 'blur(0px)';
-      credit.style.userSelect = 'none';
-      credit.style.cursor = 'pointer';
-      credit.style.opacity = '0';
-      credit.style.transition =
-        'opacity 1.2s cubic-bezier(.4,0,.2,1), filter 0.7s cubic-bezier(.4,0,.2,1)';
-      credit.innerHTML = `
-        <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;text-align:center;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
-        <a href="https://e-kezia.com" target="_blank"><span style="font-size:2.2rem;font-weight:700;line-height:1.2;text-align:center;">@EKEZIA</span></a>
-      `;
-      document.body.appendChild(credit);
-      setTimeout(() => {
-        credit.style.opacity = '1';
-      }, 50);
-      // Animate blur from 0px to 4px and loop
-      let blurVal = 0;
-      let blurDir = 1;
-      credit._blurInterval = setInterval(() => {
-        blurVal += blurDir * 0.2;
-        if (blurVal >= 4) blurDir = -1;
-        if (blurVal <= 0) blurDir = 1;
-        credit.style.filter = `blur(${blurVal}px)`;
-      }, 50);
-      credit._cleanup = () => clearInterval(credit._blurInterval);
-    }
+    showCreditOverlay(true);
 
     // Show restart button styled like AUTOPILOT, replace timer
     if (!restartBtn) {
@@ -443,8 +583,10 @@ function startPlayback(fromOffset = 0) {
       restartBtn.style.bottom = '30px';
       restartBtn.style.transform = 'translateX(-50%)';
       restartBtn.style.zIndex = 10001;
+      restartBtn.style.boxShadow = '0 0 50px 0 rgba(255, 255, 255, 0.5)';
       restartBtn.onclick = () => {
         // Remove credit overlay
+        const credit = document.getElementById('credit-overlay');
         if (credit && credit.parentNode) {
           if (credit._cleanup) credit._cleanup();
           credit.parentNode.removeChild(credit);
@@ -452,14 +594,14 @@ function startPlayback(fromOffset = 0) {
         // Hide restart button
         restartBtn.style.display = 'none';
         // Show play/pause and timer again
-        if (playBtn) {
-          playBtn.style.opacity = '1';
-          playBtn.style.pointerEvents = 'auto';
-        }
-        if (pauseBtn) {
-          pauseBtn.style.opacity = '1';
-          pauseBtn.style.pointerEvents = 'auto';
-        }
+        // if (playBtn) {
+        //   playBtn.style.opacity = '1';
+        //   playBtn.style.pointerEvents = 'auto';
+        // }
+        // if (pauseBtn) {
+        //   pauseBtn.style.opacity = '1';
+        //   pauseBtn.style.pointerEvents = 'auto';
+        // }
         if (playbackTimestamp) playbackTimestamp.style.display = 'flex';
         // Show the map again
         const cesiumContainer = document.getElementById('cesiumContainer');
@@ -486,7 +628,7 @@ function pausePlayback() {
     playBtn.textContent = '▶︎ PLAY';
     playBtn.style.opacity = '1';
     playBtn.style.pointerEvents = 'auto';
-    playBtn.style.zIndex = '16';
+    playBtn.style.zIndex = '11000';
     // Defensive: always ensure visible after pause
     setTimeout(() => {
       playBtn.style.opacity = '1';
@@ -495,8 +637,13 @@ function pausePlayback() {
   if (pauseBtn) {
     pauseBtn.style.opacity = '0';
     pauseBtn.style.pointerEvents = 'none';
-    pauseBtn.style.zIndex = '15';
+    pauseBtn.style.zIndex = '10000';
   }
+  // Show play button after pausing
+  playBtn.style.opacity = '1';
+  playBtn.style.pointerEvents = 'auto';
+  pauseBtn.style.opacity = '0';
+  pauseBtn.style.pointerEvents = 'none';
 }
 
 function togglePlayback() {
@@ -506,9 +653,11 @@ function togglePlayback() {
   const canPause = pauseBtn.style.pointerEvents !== 'none';
 
   if (isPlaying) {
+    console.log('here');
     if (!canPause) return;
     pauseBtn.click();
   } else {
+    console.log('no here');
     if (!canPlay) return;
     playBtn.click();
   }
@@ -528,7 +677,9 @@ function stopPlayback() {
     playBtn.textContent = '▶︎ PLAY';
     playBtn.style.opacity = '1';
     playBtn.style.pointerEvents = 'auto';
-    playBtn.style.zIndex = '16';
+    playBtn.style.zIndex = '11000';
+    pauseBtn.style.opacity = '0';
+    pauseBtn.style.pointerEvents = 'none';
   }
   console.log('Playback stopped');
 }
@@ -546,7 +697,6 @@ locDiv.style.bottom = '10px';
 locDiv.style.left = '10px';
 locDiv.style.color = 'white';
 locDiv.style.zIndex = '10000';
-locDiv.style.fontFamily = "'Wallpoet', sans-serif";
 locDiv.innerText = '00.00, 00.00';
 document.body.appendChild(locDiv);
 
@@ -648,6 +798,8 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
           // roomInputContainer.innerHTML += `<button id="gc-enter-room" style="margin-left:8px width:100%;">Enter</button>`;
           console.log('Assigned room:', j.room, 'from', url);
           setStatus('Room assigned: ' + j.room);
+          roomReady = true;
+          checkAllReady();
           return;
         }
       } catch (err) {
@@ -661,6 +813,8 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
 
     console.warn('Could not get room from server; tried:', tried);
     setStatus('Room assignment failed — check server');
+    roomReady = true; // Still allow UI to show even if room assignment fails
+    checkAllReady();
   })();
 
   function setStatus(s) {
@@ -735,49 +889,48 @@ document.addEventListener('DOMContentLoaded', showUserLocation);
 
 // UI ELEMENTS & LOGIC
 // redirect to /remote/ if on mobile device — but only if that path exists
-if (isMobile) {
-  (async () => {
-    try {
-      const remoteIndex = new URL('/remote/index.html', window.location.origin)
-        .href;
-      // Try a HEAD request first; some hosts don't allow HEAD so fall back to GET
-      let ok = false;
-      try {
-        const resp = await fetch(remoteIndex, { method: 'HEAD' });
-        ok = resp && resp.ok;
-      } catch (headErr) {
-        try {
-          const resp2 = await fetch(remoteIndex, { method: 'GET' });
-          ok = resp2 && resp2.ok;
-        } catch (getErr) {
-          ok = false;
-        }
-      }
+// if (isMobile) {
+//   (async () => {
+//     try {
+//       const remoteIndex = new URL('/remote/index.html', window.location.origin)
+//         .href;
+//       // Try a HEAD request first; some hosts don't allow HEAD so fall back to GET
+//       let ok = false;
+//       try {
+//         const resp = await fetch(remoteIndex, { method: 'HEAD' });
+//         ok = resp && resp.ok;
+//       } catch (headErr) {
+//         try {
+//           const resp2 = await fetch(remoteIndex, { method: 'GET' });
+//           ok = resp2 && resp2.ok;
+//         } catch (getErr) {
+//           ok = false;
+//         }
+//       }
 
-      if (ok) {
-        const currentUrl = new URL(window.location.href);
-        currentUrl.pathname = '/remote/';
-        window.location.href = currentUrl.href;
-      } else {
-        console.warn(
-          'Remote path not found; skipping mobile redirect to /remote/',
-        );
-      }
-    } catch (err) {
-      console.warn('Error checking remote path, skipping redirect', err);
-    }
-  })();
-}
+//       if (ok) {
+//         const currentUrl = new URL(window.location.href);
+//         currentUrl.pathname = '/remote/';
+//         window.location.href = currentUrl.href;
+//       } else {
+//         console.warn(
+//           'Remote path not found; skipping mobile redirect to /remote/',
+//         );
+//       }
+//     } catch (err) {
+//       console.warn('Error checking remote path, skipping redirect', err);
+//     }
+//   })();
+// }
 
 // UI elements
 // Playback timestamp element
 playbackTimestamp.id = 'playback-timestamp';
 playbackTimestamp.style.position = 'fixed';
-playbackTimestamp.style.bottom = '30px';
+playbackTimestamp.style.bottom = '10px';
 playbackTimestamp.style.left = '50%';
 playbackTimestamp.style.transform = 'translateX(-50%)';
 playbackTimestamp.style.color = 'white';
-playbackTimestamp.style.fontFamily = "'Wallpoet', sans-serif";
 playbackTimestamp.style.fontSize = '1.2rem';
 playbackTimestamp.style.zIndex = 10000;
 playbackTimestamp.style.textContent = '00:00';
@@ -786,6 +939,7 @@ playbackTimestamp.style.display = 'flex';
 playbackTimestamp.style.alignItems = 'center';
 playbackTimestamp.style.justifyContent = 'center';
 playbackTimestamp.style.color = 'white';
+playbackTimestamp.style.opacity = 0.3;
 document.body.appendChild(playbackTimestamp);
 
 let playbackInterval = null;
@@ -793,7 +947,7 @@ let playbackStartTime = null;
 
 // Update scrubber position to follow audio progress
 function updateScrubberProgress(currentTime) {
-  if (DEBUG && scrubber && audioBuffer) {
+  if (scrubber && audioBuffer) {
     const percent = (currentTime / audioBuffer.duration) * 100;
     scrubber.value = percent;
   }
@@ -829,33 +983,7 @@ function startPlaybackTimestamp(offset = 0) {
       audioEnded = true;
       if (typeof source !== 'undefined') stopPlayback();
       // Show credit overlay and restart button (single implementation)
-      let credit = document.getElementById('credit-overlay');
-      if (!credit) {
-        credit = document.createElement('div');
-        credit.id = 'credit-overlay';
-        credit.style.position = 'fixed';
-        credit.style.top = '0';
-        credit.style.left = '0';
-        credit.style.width = '100vw';
-        credit.style.height = '100vh';
-        credit.style.background = 'rgba(0,0,0,0.8)';
-        credit.style.color = 'white';
-        credit.style.display = 'flex';
-        credit.style.flexDirection = 'column';
-        credit.style.alignItems = 'center';
-        credit.style.justifyContent = 'center';
-        credit.style.fontSize = '6rem';
-        credit.style.zIndex = '999';
-        credit.style.backdropFilter = 'blur(16px)';
-        credit.style.filter = 'blur(2px)';
-        credit.style.userSelect = 'none';
-        credit.style.cursor = 'pointer';
-        credit.innerHTML = `
-          <span style="font-size:1.1rem;opacity:0.7;letter-spacing:1px;text-align:center;">CREATIVE DIRECTION & WEBSITE DEVELOPMENT BY</span>
-          <a href="https://e-kezia.com" target="_blank"><span style="font-size:2.2rem;font-weight:700;line-height:1.2;text-align:center;">@EKEZIA</span></a>
-        `;
-        document.body.appendChild(credit);
-      }
+      showCreditOverlay();
       // Show restart button styled like AUTOPILOT, replace timer
       if (!restartBtn) {
         restartBtn = document.createElement('button');
@@ -872,6 +1000,7 @@ function startPlaybackTimestamp(offset = 0) {
         restartBtn.style.transition = 'background 0.2s, color 0.2s';
         restartBtn.onclick = () => {
           // Remove credit overlay
+          const credit = document.getElementById('credit-overlay');
           if (credit && credit.parentNode) {
             if (credit._cleanup) credit._cleanup();
             credit.parentNode.removeChild(credit);
@@ -927,78 +1056,126 @@ function stopPlaybackTimestamp() {
   playbackTimestamp.textContent = '00:00';
 }
 
-function showPlayOnHover() {
-  playBtn.addEventListener('mouseenter', () => {
-    playBtn.style.opacity = '1';
-  });
-  playBtn.addEventListener('mouseleave', () => {
-    playBtn.style.opacity = '0';
-  });
-  playBtn.style.zIndex = '16';
-  pauseBtn.style.zIndex = '15';
+function setInfoUIVisibility(visible) {
+  const opacity = visible ? '0.7' : '0';
+  gyroInfoUI.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+  gyroInfoUI.style.fontSize = '1.2rem';
+  deltaInfoUI.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+  deltaInfoUI.style.fontSize = '1.2rem';
+  idUI.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+  idUI.style.fontSize = '1.2rem';
+  locDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+  locDiv.style.fontSize = '1.2rem';
+  playbackTimestamp.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+  gyroInfoUI.style.opacity = opacity;
+  deltaInfoUI.style.opacity = opacity;
+  idUI.style.opacity = opacity;
+  locDiv.style.opacity = opacity;
+  playbackTimestamp.style.opacity = opacity;
 }
+setInfoUIVisibility(false);
 
-// Show pause button only on hover
-function showPauseOnHover() {
-  pauseBtn.addEventListener('mouseenter', () => {
-    pauseBtn.style.opacity = '1';
-  });
-  pauseBtn.addEventListener('mouseleave', () => {
-    pauseBtn.style.opacity = '0';
-  });
-  pauseBtn.style.zIndex = '16';
-  playBtn.style.zIndex = '15';
+// Helper function to show credit overlay
+function showCreditOverlay(enableBlurAnimation = false) {
+  let credit = document.getElementById('credit-overlay');
+  if (!credit) {
+    credit = document.createElement('div');
+    credit.id = 'credit-overlay';
+    credit.style.position = 'fixed';
+    credit.style.top = '0';
+    credit.style.left = '0';
+    credit.style.width = '100vw';
+    credit.style.height = '100vh';
+    credit.style.background = 'rgba(0,0,0,0.8)';
+    credit.style.color = 'white';
+    credit.style.display = 'flex';
+    credit.style.flexDirection = 'column';
+    credit.style.alignItems = 'center';
+    credit.style.justifyContent = 'center';
+    credit.style.fontSize = '6rem';
+    credit.style.zIndex = '10000';
+    credit.style.backdropFilter = enableBlurAnimation
+      ? 'blur(0px)'
+      : 'blur(16px)';
+    credit.style.filter = enableBlurAnimation ? 'blur(0px)' : 'blur(1px)';
+    credit.style.userSelect = 'none';
+    credit.style.cursor = 'pointer';
+    credit.style.opacity = '0';
+    credit.style.transition = enableBlurAnimation
+      ? 'opacity 1.2s cubic-bezier(.4,0,.2,1), filter 0.7s cubic-bezier(.4,0,.2,1)'
+      : 'opacity 1.2s cubic-bezier(.4,0,.2,1)';
+    credit.innerHTML = `
+      <span style="font-size:5rem;letter-spacing:1px;text-align:center;display:block;">MACHINE #4</span>
+      <span style="font-size:2rem;letter-spacing:1px;text-align:center;display:block;">ORIGINAL PRODUCTION BY</span>
+      <div style="width:200px;height:200px;border:8px solid white;background:black;display:flex;align-items:center;justify-content:center;margin:20px 0;">
+        <span style="color:white;font-size:2.5rem;text-align:center;">DAVID BORING</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span style="font-size:1.5rem;display:inline-block;width:2rem;height:2rem;line-height:2rem;text-align:center;border:2px solid white;border-radius:50%;">C</span><span style="font-size:2rem;display:inline-flex;">+</span><span style="font-size:1.5rem;display:inline-block;width:2rem;height:2rem;line-height:2rem;text-align:center;border:2px solid white;border-radius:50%;">P</span><span style="font-size:2rem;display:inline-flex;">2026 DAVID BORING / ELIZABETH KEZIA WIDJAJA</span>
+      </div>
+       <span style="font-size:2rem;text-align:center;display:block;">ALL RIGHTS RESERVED</span>
+    `;
+    document.body.appendChild(credit);
+
+    // Animate blur from 0px to 4px and loop if enabled
+    if (enableBlurAnimation) {
+      let blurVal = 0;
+      let blurDir = 1;
+      credit._blurInterval = setInterval(() => {
+        blurVal += blurDir * 0.2;
+        if (blurVal >= 4) blurDir = -1;
+        if (blurVal <= 0) blurDir = 1;
+        credit.style.filter = `blur(${blurVal}px)`;
+      }, 50);
+      credit._cleanup = () => clearInterval(credit._blurInterval);
+    }
+  }
+  setTimeout(() => {
+    credit.style.opacity = '1';
+  }, 50);
 }
 
 // Click Listener
 // Play button click
 playBtn.addEventListener('click', function (e) {
   e.preventDefault();
-  // Ensure audio context is resumed for autoplay policy
+  if (isPlaying) return;
   if (window.audioCtx && window.audioCtx.state === 'suspended') {
     window.audioCtx.resume();
   }
-  startPlayback(pauseTime || 0); // <-- pass pauseTime
+  startPlayback(pauseTime || 0);
   isPlaying = true;
   isPaused = false;
   audioEnded = false;
-  document.dispatchEvent(new CustomEvent('play-clicked'));
-  showPauseOnHover();
   startPlaybackTimestamp(pauseTime || 0);
+  setInfoUIVisibility(true);
+  showPauseOnHover();
 });
 
 // Pause button click
 pauseBtn.addEventListener('click', function (e) {
   e.preventDefault();
-
   if (!isPlaying) return;
-
-  // Stop audio and save current position
-  if (source) {
-    try {
-      source.stop();
-    } catch (e) {}
-    source.disconnect();
-    source = null;
-  }
-
-  clearInterval(interval);
-
-  // Save offset to resume from
+  stopPlayback();
   pauseTime = audioCtx.currentTime - startTime;
-
   isPlaying = false;
   isPaused = true;
   audioEnded = false;
-
-  document.dispatchEvent(new CustomEvent('pause-clicked'));
-
-  // fade out play button & hide
-  document.getElementById('pauseBtn').style.opacity = '0';
-  showPlayOnHover(); // Handler is now attached only once after playBtn is defined
-  pausePlayback(pauseTime);
   pausePlaybackTimestamp(pauseTime);
+  // setInfoUIVisibility(false);
+  showPlayOnHover();
 });
+function showPlayOnHover() {
+  playBtn.style.opacity = !isPlaying ? '1' : '0';
+  pauseBtn.style.opacity = '0';
+  playBtn.style.pointerEvents = 'auto';
+}
+
+function showPauseOnHover() {
+  playBtn.style.opacity = '0';
+  pauseBtn.style.opacity = isPlaying ? '1' : '0';
+  pauseBtn.style.pointerEvents = 'auto';
+}
 
 // Listen for audio end event from convert-sound.js
 document.addEventListener('audio-ended', function () {
@@ -1007,6 +1184,7 @@ document.addEventListener('audio-ended', function () {
   audioEnded = true;
   createRestartBtn();
   stopPlaybackTimestamp();
+  setInfoUIVisibility(false);
 });
 
 // Listen for restart event
@@ -1015,10 +1193,12 @@ document.addEventListener('restart-clicked', function () {
   isPlaying = false;
   isPaused = false;
   showPlayButton();
+  setInfoUIVisibility(false);
 });
 
 const guestBtn = document.getElementById('gc-connect');
 guestBtn.addEventListener('click', () => {
+  shadowMovementEnabled = true;
   isGuest = true;
   hasSelectedMode = true;
 
@@ -1028,7 +1208,7 @@ guestBtn.addEventListener('click', () => {
   // Enable playback controls
   playBtn.style.pointerEvents = 'auto';
   pauseBtn.style.pointerEvents = 'auto';
-
+  pauseBtn.style.opacity = '0'; // Ensure pauseBtn is hidden on entry
   // Immediately start playback in guest mode
   if (typeof startPlayback === 'function') {
     startPlayback(0);
@@ -1037,7 +1217,6 @@ guestBtn.addEventListener('click', () => {
     isPaused = false;
     audioEnded = false;
     document.dispatchEvent(new CustomEvent('play-clicked'));
-    showPauseOnHover();
   }
 });
 
@@ -1098,9 +1277,8 @@ function hideRoomCodePanel() {
 // --- BLINKING ---
 // Text animation
 const texts = [
-  { text: 'MACHINE#4', fontSize: '8rem' },
-  { text: 'DAVID', fontSize: '8rem' },
-  { text: 'BORING', fontSize: '8rem' },
+  { text: 'MACHINE #4', fontSize: '12rem' },
+  { text: 'DAVID BORING', fontSize: '12rem' },
 ];
 let textInterval;
 let textCount = 0;

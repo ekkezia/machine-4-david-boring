@@ -23,10 +23,11 @@ import { isMobile } from '../utils.js';
     existingParagraphs.forEach((el) => gyroDependentEls.push(el));
 
     gyroNotice = document.createElement('p');
-    gyroNotice.textContent =
-      'You have decided to use your mobile device as a remote. Gyroscope access is required to use your mobile device as a controller for [MACHINE #4] music video. Tap "Enable Gyro" to continue.';
+    gyroNotice.innerHTML = `You have decided to use your mobile device as a remote. Gyroscope access is required to use your mobile device as a controller for [MACHINE #4] music video.<br /><br />Tap "Enable Gyro" to continue.`;
     gyroNotice.style.margin = '0 0 8px 0';
+    gyroNotice.style.fontSize = '1.2rem';
     gyroNotice.style.color = '#ffffff';
+    gyroNotice.style.textAlign = 'center';
     guestPanelEl.insertBefore(gyroNotice, guestPanelEl.firstChild);
   }
 
@@ -263,6 +264,8 @@ import { isMobile } from '../utils.js';
 
   gyroBtn = document.createElement('button');
   gyroBtn.textContent = 'Enable Gyro';
+  gyroBtn.style.transform = 'translateX(-50%)';
+  gyroBtn.style.left = '50%';
   gyroBtn.style.width = 'fit-content';
   gyroBtn.style.border = '1px solid rgba(255,255,255,1)';
   gyroBtn.style.position = 'relative';

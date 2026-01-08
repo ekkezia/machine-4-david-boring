@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Wallpoet&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./index.css" />
@@ -41,7 +41,7 @@
     <!-- ML5.js for Face Mesh detection -->
     <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
   </head>
-  <body class="wallpoet-regular">
+  <body class="bebas-neue-regular">
     <div id="controls">
       <!-- <label for="mapEngineSelect" style="color: white; margin-right: 8px"
         >Map:</label -->
@@ -50,12 +50,8 @@
         <option value="cesium">Cesium</option>
         <option value="leaflet">Leaflet</option>
       </select> -->
-      <button id="playBtn" class="wallpoet-regular control-hover-area">
-        ▶ PLAY
-      </button>
-      <button id="pauseBtn" class="wallpoet-regular control-hover-area">
-        ❚❚ PAUSE
-      </button>
+      <button id="playBtn" class="control-hover-area">▶ PLAY</button>
+      <button id="pauseBtn" class="control-hover-area">❚❚ PAUSE</button>
     </div>
 
     <!-- Playback timestamp -->
@@ -89,7 +85,22 @@
 
     <div id="cesiumContainer"></div>
     <!-- Leaflet container (hidden by default) -->
-    <div id="shadow"></div>
+    <!-- <div id="shadow"></div> -->
+    <style>
+      #cesiumContainer {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 10;
+        pointer-events: auto;
+      }
+      #lyrics-container {
+        background: black;
+        z-index: 1;
+      }
+    </style>
 
     <!-- Load our scripts -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>

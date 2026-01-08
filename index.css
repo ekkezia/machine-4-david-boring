@@ -3,14 +3,12 @@ a, a:visited, a:active {
   color: #fff !important;
   text-decoration: none !important;
 }
-@font-face {
-        font-family: 'Wallpoet';
-        src: url('https://fonts.gstatic.com/s/wallpoet/v16/f0X10em2_8RnXVVdUObp58Q.woff2')
-          format('woff2');
+      .bebas-neue-regular {
+        font-family: "Bebas Neue", sans-serif;
         font-weight: 400;
         font-style: normal;
-        font-display: swap;
       }
+
 
       .wallpoet-regular {
         font-family: 'Wallpoet', sans-serif;
@@ -26,6 +24,7 @@ a, a:visited, a:active {
         padding: 0;
         overflow: hidden;
         filter: blur(0.4px);
+        background: black;
       }
       #shadow {
         box-shadow: 0 0 10vw 20vw rgba(0, 0, 0, 1) inset;
@@ -40,7 +39,6 @@ a, a:visited, a:active {
         pointer-events: none;
         z-index: 9999;
         transition: 'background 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s cubic-bezier(.4,0,.2,1)';
-
       }
 
       /* Blinking animation - shadow switches between inset and outset with dramatic intensity changes */
@@ -94,8 +92,8 @@ a, a:visited, a:active {
         transition: opacity 0.5s cubic-bezier(.4, 0, .2, 1);
         background: radial-gradient(
           circle at center,
-          rgba(255, 255, 255, 0.2) 0%,
-          rgba(255, 255, 255, 0) 70%
+          rgba(0, 0, 0, 1) 10%,
+          rgba(255, 255, 255, 0) 50%
         );
       }
       #controls:has(#playBtn:hover)::before {
@@ -134,16 +132,18 @@ a, a:visited, a:active {
         left: 50%;
         transform: translate(-50%, -50%);
         pointer-events: auto;
-        font-size: 20px;
-        color: white;
+        font-size: 4rem;
+        color: rgba(255, 255, 255, 1);
+        opacity: 0.5;
         background-color: transparent;
         border: none;
         cursor: pointer;
-        z-index: 12;
+        z-index: 10000;
         width: 50vw;
         height: 30vh;
         opacity: 0;
         transition: opacity 0.5s ease;
+        filter: blur(2px);
       }
 
 #video {
@@ -156,11 +156,12 @@ a, a:visited, a:active {
 
 button {
   padding: 0.5rem;
-  font-family: 'Wallpoet', sans-serif;
-  font-size: 1rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
   color: white;
   border: 1px solid rgba(255,255,255,0);
   background: rgba(0, 0, 0, 1);
+  box-shadow: none;
 }
 
 button:hover {
