@@ -314,6 +314,7 @@ import { isMobile } from '../utils.js';
   });
 
   gyroBtn.addEventListener('click', async () => {
+    alert('click gyro');
     const ok = await enableCompass();
     if (ok) gyroBtn.style.display = 'none'; //
   });
