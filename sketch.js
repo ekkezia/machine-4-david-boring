@@ -173,7 +173,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!cesiumContainer) return;
     const canvas = cesiumContainer.querySelector('canvas');
     if (!canvas) return;
-    const svgMask = "url('/public/mask.svg')";
+    const svgMask = "url('/mask.svg')";
     cesiumContainer.style.webkitMaskImage = svgMask;
     cesiumContainer.style.maskImage = svgMask;
     cesiumContainer.style.webkitMaskRepeat = 'no-repeat';
@@ -257,7 +257,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
-  loadAudio('/public/audio.wav').then(() => {
+  loadAudio('/audio.wav').then(() => {
     setTimeout(() => {
       tryStartExperience();
     }, 1000);
