@@ -409,6 +409,8 @@ function startPlayback(fromOffset = 0) {
     lyricsContainer.style.justifyContent = 'center';
     lyricsContainer.style.alignItems = 'center';
     lyricsContainer.style.flexDirection = 'column';
+    lyricsContainer.classList.add('pinyon-script-regular');
+
     document.body.appendChild(lyricsContainer);
   }
 
