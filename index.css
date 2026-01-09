@@ -9,6 +9,11 @@ a, a:visited, a:active {
         font-style: normal;
       }
 
+.pinyon-script-regular {
+  font-family: "Pinyon Script", cursive;
+  font-weight: 400;
+  font-style: normal;
+}
 
       .wallpoet-regular {
         font-family: 'Wallpoet', sans-serif;
