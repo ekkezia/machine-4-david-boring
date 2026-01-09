@@ -82,7 +82,7 @@ export const LYRICS = [
   { start: 23.0, end: 25.0, text: 'Routine is a spectrum' },
   { start: 25.0, end: 28.0, text: 'Silent the voices in my head' },
   { start: 29.8, end: 30.0, text: '!!!!!!!!!!!!!!!!' },
-  { start: 30.2, end: 30.4, text: '@*&^%)#*&))()*)_' },
+  { start: 30.3, end: 30.5, text: '@*&^%)#*&))()*)_' },
   { start: 31.0, end: 33.0, text: 'Routine is a spectrum' },
   { start: 33.0, end: 36.0, text: 'Live with the violence that you know' },
   { start: 37.2, end: 37.4, text: '!!!!!!!!!!!!!!!!' },
