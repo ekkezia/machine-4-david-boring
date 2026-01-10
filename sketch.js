@@ -257,7 +257,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
-  loadAudio('/public/audio.wav').then(() => {
+  loadAudio('/audio.wav').then(() => {
     setTimeout(() => {
       tryStartExperience();
     }, 1000);
