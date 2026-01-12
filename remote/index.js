@@ -2,46 +2,15 @@ import { defaultServer } from '../config.js';
 import { isMobile } from '../utils.js';
 
 (function () {
-  // Add a test button to verify click/alert works at all
-  let gyroBtn = document.createElement('button');
-  gyroBtn.style.zIndex = 100000;
-  gyroBtn.style.display = 'block';
-  gyroBtn.style.background = '#222';
-  gyroBtn.style.color = '#fff';
-  gyroBtn.style.border = '2px solid #fff';
-  gyroBtn.style.padding = '16px 32px';
-  gyroBtn.style.fontSize = '1.3rem';
-  gyroBtn.style.boxShadow = '0 4px 32px 0 rgba(0,0,0,0.25)';
-  gyroBtn.style.cursor = 'pointer';
-  gyroBtn.style.pointerEvents = 'auto';
-  document.body.appendChild(gyroBtn);
-  document.body.appendChild(gyroBtn); // move to end of body for stacking
   // redirect to /  if on desktop device
-  if (!isMobile) {
-    const currentUrl = new URL(window.location.href);
-    currentUrl.pathname = '/';
-    window.location.href = currentUrl.href;
-  }
+  // if (!isMobile) {
+  //   const currentUrl = new URL(window.location.href);
+  //   currentUrl.pathname = '/';
+  //   window.location.href = currentUrl.href;
+  // }
 
   let status = null;
   let gyroEnabled = false;
-
-  // Always create gyroBtn first so it exists for display logic
-  gyroBtn.textContent = 'Enable Gyro';
-  gyroBtn.style.transform = 'translateX(-50%)';
-  gyroBtn.style.left = '50%';
-  gyroBtn.style.width = 'fit-content';
-  gyroBtn.style.border = '1px solid rgba(255,255,255,1)';
-  gyroBtn.style.position = 'relative';
-  gyroBtn.style.zIndex = 100000;
-  gyroBtn.style.display = 'block';
-  document.body.appendChild(gyroBtn);
-
-  gyroBtn.addEventListener('click', async () => {
-    alert('click gyro');
-    const ok = await enableCompass();
-    if (ok) gyroBtn.style.display = 'none'; //
-  });
 
   const guestPanelEl = document.getElementById('guest-panel');
   const roomInputContainerEl = document.getElementById('room-input-container');
@@ -60,6 +29,31 @@ import { isMobile } from '../utils.js';
     gyroNotice.style.textAlign = 'center';
     guestPanelEl.insertBefore(gyroNotice, guestPanelEl.firstChild);
 
+    let gyroBtn = document.createElement('button');
+    gyroBtn.style.zIndex = 100000;
+    gyroBtn.style.display = 'block';
+    gyroBtn.style.background = '#222';
+    gyroBtn.style.color = '#fff';
+    gyroBtn.style.border = '2px solid #fff';
+    gyroBtn.style.padding = '16px 32px';
+    gyroBtn.style.fontSize = '1.3rem';
+    gyroBtn.style.boxShadow = '0 4px 32px 0 rgba(0,0,0,0.25)';
+    gyroBtn.style.cursor = 'pointer';
+    gyroBtn.style.pointerEvents = 'auto';
+    gyroBtn.textContent = 'Enable Gyro';
+    gyroBtn.style.transform = 'translateX(-50%)';
+    gyroBtn.style.left = '50%';
+    gyroBtn.style.width = 'fit-content';
+    gyroBtn.style.border = '1px solid rgba(255,255,255,1)';
+    gyroBtn.style.position = 'relative';
+    gyroBtn.style.display = 'block';
+    // insert the button after the gyro notice so it appears below the notice
+    guestPanelEl.insertBefore(gyroBtn, gyroNotice.nextSibling);
+    gyroBtn.addEventListener('click', async () => {
+      const ok = await enableCompass();
+      if (ok) gyroBtn.style.display = 'none'; //
+    });
+
     // If gyro is already enabled, show notice and room input immediately, else show gyroBtn
     let gyroPermissionNotRequired =
       window.DeviceOrientationEvent &&
@@ -68,9 +62,11 @@ import { isMobile } from '../utils.js';
       toggleRoomInputAvailability(true);
       if (gyroBtn) gyroBtn.style.display = 'none';
     } else if (window.gyroEnabled) {
+      alert('toggle room input availability TRUE!');
       toggleRoomInputAvailability(true);
       if (gyroBtn) gyroBtn.style.display = 'none';
     } else {
+      alert('toggle room input availability FALSE!');
       if (gyroBtn) gyroBtn.style.display = 'block';
     }
   }
@@ -142,13 +138,13 @@ import { isMobile } from '../utils.js';
   compassWrapper.style.height = '80vw';
   compassWrapper.style.border = '2px solid #fff';
   compassWrapper.style.borderRadius = '50%';
-  compassWrapper.style.display = 'flex';
   compassWrapper.style.alignItems = 'center';
   compassWrapper.style.justifyContent = 'center';
   compassWrapper.style.transition = 'transform 0.1s linear';
   compassWrapper.style.transformOrigin = 'center center';
   compassWrapper.style.userSelect = 'none';
   compassWrapper.style.pointerEvents = 'none';
+  compassWrapper.style.display = 'none';
 
   compassCenterWrapper.appendChild(compassWrapper);
   document.body.append(compassCenterWrapper);
@@ -223,7 +219,6 @@ import { isMobile } from '../utils.js';
 
   // request permission if needed (for iOS)
   async function enableCompass() {
-    alert('enableCompass called');
     console.log('[DEBUG] enableCompass called');
     if (gyroEnabled) {
       alert('Gyro already enabled, skipping permission.');
