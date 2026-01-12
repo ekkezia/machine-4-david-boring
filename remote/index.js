@@ -4,10 +4,6 @@ import { isMobile } from '../utils.js';
 (function () {
   // Add a test button to verify click/alert works at all
   let gyroBtn = document.createElement('button');
-  gyroBtn.style.position = 'fixed';
-  gyroBtn.style.top = '30%';
-  gyroBtn.style.left = '50%';
-  gyroBtn.style.transform = 'translate(-50%, 0)';
   gyroBtn.style.zIndex = 100000;
   gyroBtn.style.display = 'block';
   gyroBtn.style.background = '#222';
@@ -15,7 +11,6 @@ import { isMobile } from '../utils.js';
   gyroBtn.style.border = '2px solid #fff';
   gyroBtn.style.padding = '16px 32px';
   gyroBtn.style.fontSize = '1.3rem';
-  gyroBtn.style.borderRadius = '12px';
   gyroBtn.style.boxShadow = '0 4px 32px 0 rgba(0,0,0,0.25)';
   gyroBtn.style.cursor = 'pointer';
   gyroBtn.style.pointerEvents = 'auto';
