@@ -62,11 +62,9 @@ import { isMobile } from '../utils.js';
       toggleRoomInputAvailability(true);
       if (gyroBtn) gyroBtn.style.display = 'none';
     } else if (window.gyroEnabled) {
-      alert('toggle room input availability TRUE!');
       toggleRoomInputAvailability(true);
       if (gyroBtn) gyroBtn.style.display = 'none';
     } else {
-      alert('toggle room input availability FALSE!');
       if (gyroBtn) gyroBtn.style.display = 'block';
     }
   }
@@ -231,10 +229,10 @@ import { isMobile } from '../utils.js';
         typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function'
       ) {
-        alert('Requesting DeviceOrientationEvent permission...');
+        // alert('Requesting DeviceOrientationEvent permission...');
         console.log('[DEBUG] Requesting DeviceOrientationEvent permission...');
         ok = (await DeviceOrientationEvent.requestPermission()) === 'granted';
-        alert('Permission result: ' + ok);
+        // alert('Permission result: ' + ok);
         console.log('[DEBUG] Permission result:', ok);
       } else {
         // Permission API not present; assume permission not required
@@ -277,7 +275,7 @@ import { isMobile } from '../utils.js';
     // Only hide the button if gyro is truly enabled
     if (typeof gyroBtn !== 'undefined' && gyroBtn && gyroEnabled)
       gyroBtn.style.display = 'none';
-    alert('Gyro enabled and event listener added.');
+    // alert('Gyro enabled and event listener added.');
     return true;
   }
 
@@ -342,7 +340,6 @@ import { isMobile } from '../utils.js';
   });
 
   enterBtn.addEventListener('click', () => {
-    // alert('abcd');
     const hiddenEl = document.getElementById('gc-room-hidden');
     if (!hiddenEl) return alert('Room input not found');
     const code = (hiddenEl.value || '').trim().toUpperCase();
