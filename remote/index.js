@@ -37,6 +37,12 @@ import { isMobile } from '../utils.js';
   gyroBtn.style.display = 'block';
   document.body.appendChild(gyroBtn);
 
+  gyroBtn.addEventListener('click', async () => {
+    alert('click gyro');
+    const ok = await enableCompass();
+    if (ok) gyroBtn.style.display = 'none'; //
+  });
+
   const guestPanelEl = document.getElementById('guest-panel');
   const roomInputContainerEl = document.getElementById('room-input-container');
   const gyroDependentEls = [];
@@ -344,11 +350,5 @@ import { isMobile } from '../utils.js';
     if (!socket) socket = io(defaultServer);
 
     socket.emit('join-room', code, 'remote');
-  });
-
-  gyroBtn.addEventListener('click', async () => {
-    alert('click gyro');
-    const ok = await enableCompass();
-    if (ok) gyroBtn.style.display = 'none'; //
   });
 })();
