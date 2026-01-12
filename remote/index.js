@@ -147,7 +147,7 @@ import { isMobile } from '../utils.js';
   compassCenterWrapper.appendChild(compassWrapper);
   document.body.append(compassCenterWrapper);
   compassCenterWrapper.style.display = 'none';
-  compassWrapper.style.transform = `rotate(${-processedUnit}deg)`;
+  compassWrapper.style.transform = `rotate(0deg)`;
 
   // add the arrow (▲)
   const arrow = document.createElement('div');
