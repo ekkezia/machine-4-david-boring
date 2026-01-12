@@ -3,8 +3,7 @@ import { isMobile } from '../utils.js';
 
 (function () {
   // Add a test button to verify click/alert works at all
-  const debugBtn = document.createElement('button');
-  debugBtn.textContent = 'DEBUG BUTTON';
+  let gyroBtn = document.createElement('button');
   gyroBtn.style.position = 'fixed';
   gyroBtn.style.top = '30%';
   gyroBtn.style.left = '50%';
@@ -33,7 +32,6 @@ import { isMobile } from '../utils.js';
   let gyroEnabled = false;
 
   // Always create gyroBtn first so it exists for display logic
-  let gyroBtn = document.createElement('button');
   gyroBtn.textContent = 'Enable Gyro';
   gyroBtn.style.transform = 'translateX(-50%)';
   gyroBtn.style.left = '50%';
@@ -79,12 +77,21 @@ import { isMobile } from '../utils.js';
   function toggleRoomInputAvailability(enabled) {
     if (roomInputContainerEl) {
       roomInputContainerEl.style.display = enabled ? 'flex' : 'none';
+      console.log(
+        '[DEBUG] roomInputContainerEl display:',
+        roomInputContainerEl.style.display,
+        'enabled:',
+        enabled,
+      );
+    } else {
+      console.log('[DEBUG] roomInputContainerEl not found');
     }
     gyroDependentEls.forEach((el) => {
       el.style.display = enabled ? '' : 'none';
     });
     if (gyroNotice) {
       gyroNotice.style.display = enabled ? 'none' : 'block';
+      console.log('[DEBUG] gyroNotice display:', gyroNotice.style.display);
     }
   }
 
@@ -216,8 +223,10 @@ import { isMobile } from '../utils.js';
   // request permission if needed (for iOS)
   async function enableCompass() {
     alert('enableCompass called');
+    console.log('[DEBUG] enableCompass called');
     if (gyroEnabled) {
       alert('Gyro already enabled, skipping permission.');
+      console.log('[DEBUG] Gyro already enabled, skipping permission.');
       return true;
     }
 
@@ -227,13 +236,17 @@ import { isMobile } from '../utils.js';
         typeof DeviceOrientationEvent.requestPermission === 'function'
       ) {
         alert('Requesting DeviceOrientationEvent permission...');
+        console.log('[DEBUG] Requesting DeviceOrientationEvent permission...');
         ok = (await DeviceOrientationEvent.requestPermission()) === 'granted';
         alert('Permission result: ' + ok);
-
+        console.log('[DEBUG] Permission result:', ok);
         return (ok = true);
       } else {
         alert(
           'No DeviceOrientationEvent.requestPermission; assuming permission not required.',
+        );
+        console.log(
+          '[DEBUG] No DeviceOrientationEvent.requestPermission; assuming permission not required.',
         );
       }
     } catch (err) {
@@ -242,6 +255,7 @@ import { isMobile } from '../utils.js';
         'Compass permission request failed: ' +
           (err && err.message ? err.message : err),
       );
+      console.log('[DEBUG] Compass permission request failed:', err);
     }
 
     if (!ok) {
@@ -249,11 +263,15 @@ import { isMobile } from '../utils.js';
         gyroNotice.textContent = 'Gyro is required. Permission denied.';
       }
       alert('Gyroscope access is required. (Permission denied)');
+      console.log('[DEBUG] Gyroscope access is required. (Permission denied)');
       return false;
     }
 
     window.addEventListener('deviceorientation', handleOrientation, true);
     gyroEnabled = true;
+    console.log(
+      '[DEBUG] Gyro enabled, calling toggleRoomInputAvailability(true)',
+    );
     toggleRoomInputAvailability(true);
     // Only hide the button if gyro is truly enabled
     if (gyroBtn && gyroEnabled) gyroBtn.style.display = 'none';
