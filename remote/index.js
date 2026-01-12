@@ -102,12 +102,12 @@ import { isMobile } from '../utils.js';
       Object.assign(s.style, {
         width: '40px',
         height: '60px',
-        background: '#ccc',
+        background: 'rgba(255,255,255,0.3',
         borderRadius: '8px',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '20px',
+        fontSize: '28px',
         fontWeight: '600',
       });
       s.textContent = '';
