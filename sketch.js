@@ -253,23 +253,6 @@ loadingTexts.textContent = 'MACHINE #4';
 loadingDiv.appendChild(loadingTexts);
 
 // on mobile, show a small hint at the bottom of the loading overlay
-if (isMobile) {
-  const rotateHint = document.createElement('div');
-  rotateHint.id = 'loading-rotate-hint';
-  rotateHint.textContent = 'Rotate Your. Device';
-  rotateHint.style.position = 'absolute';
-  rotateHint.style.left = '50%';
-  rotateHint.style.bottom = '20px';
-  rotateHint.style.transform = 'translateX(-50%)';
-  rotateHint.style.fontSize = '1rem';
-  rotateHint.style.color = 'white';
-  rotateHint.style.opacity = '0.9';
-  rotateHint.style.transition = 'opacity 0.3s ease';
-  rotateHint.style.pointerEvents = 'none';
-  rotateHint.style.zIndex = '40000';
-  loadingDiv.appendChild(rotateHint);
-}
-
 document.body.appendChild(loadingDiv);
 
 // If mobile and not rotated, show the rotate notice immediately so it's
@@ -292,17 +275,15 @@ if (isMobile && !isDeviceRotated()) {
     rn.textContent = 'Please rotate your device to landscape to continue.';
     rn.style.opacity = '1';
     rn.style.transition = 'opacity 0.3s ease';
-    document.body.appendChild(rn);
+    loadingDiv.appendChild(rn);
   }
 }
 
 // shared rotation handler to toggle visibility of rotate notices
 function handleRotationChange() {
   const rotated = isDeviceRotated();
-  const rn = document.getElementById('rotate-notice');
-  const rh = document.getElementById('loading-rotate-hint');
-  if (rn) rn.style.opacity = rotated ? '0' : '1';
-  if (rh) rh.style.opacity = rotated ? '0' : '0.9';
+
+  if (loadingDiv) loadingDiv.style.opacity = rotated ? '0' : '1';
   // If we've become rotated to landscape and audio+map ready, proceed to remove loading overlay
   if (rotated && audioReady && mapReady) {
     tryStartExperience();
@@ -555,9 +536,7 @@ function tryStartExperience() {
     if (loadingDiv) {
       // On mobile, only remove loading overlay when device is rotated to landscape
       if (isMobile && !isDeviceRotated()) {
-        // keep loadingDiv visible; ensure rotate hint remains visible
-        const rh = document.getElementById('loading-rotate-hint');
-        if (rh) rh.style.opacity = '0.9';
+        loadingDiv.style.opacity = '1';
       } else {
         loadingDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
         loadingDiv.style.opacity = '0';
