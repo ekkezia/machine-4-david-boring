@@ -266,6 +266,7 @@ if (isMobile) {
   rotateHint.style.opacity = '0.9';
   rotateHint.style.transition = 'opacity 0.3s ease';
   rotateHint.style.pointerEvents = 'none';
+  rotateHint.style.zIndex = '40000';
   loadingDiv.appendChild(rotateHint);
 }
 
@@ -302,11 +303,9 @@ function handleRotationChange() {
   const rh = document.getElementById('loading-rotate-hint');
   if (rn) rn.style.opacity = rotated ? '0' : '1';
   if (rh) rh.style.opacity = rotated ? '0' : '0.9';
-  // toggle main UI visibility when all ready
-  if (rotated) {
-    ui.style.opacity = 1;
-  } else {
-    ui.style.opacity = 0;
+  // If we've become rotated to landscape and audio+map ready, proceed to remove loading overlay
+  if (rotated && audioReady && mapReady) {
+    tryStartExperience();
   }
 }
 
@@ -547,18 +546,26 @@ function checkAllReady() {
   }
 
   // Desktop or mobile rotated: show UI
-  ui.style.opacity = 1;
+  if (!isAutopilot) ui.style.opacity = 1; // todo: consider better check to make sure ui didnt reappear when user rotates back from portrait to landscape
 }
 
 function tryStartExperience() {
   if (audioReady && mapReady) {
     const loadingDiv = document.getElementById('audio-loading');
     if (loadingDiv) {
-      loadingDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
-      loadingDiv.style.opacity = '0';
-      setTimeout(() => {
-        loadingDiv.remove();
-      }, 700);
+      // On mobile, only remove loading overlay when device is rotated to landscape
+      if (isMobile && !isDeviceRotated()) {
+        // keep loadingDiv visible; ensure rotate hint remains visible
+        const rh = document.getElementById('loading-rotate-hint');
+        if (rh) rh.style.opacity = '0.9';
+      } else {
+        loadingDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+        loadingDiv.style.opacity = '0';
+        setTimeout(() => {
+          const d = document.getElementById('audio-loading');
+          if (d && d.parentNode) d.parentNode.removeChild(d);
+        }, 700);
+      }
     }
     setInfoUIVisibility(true); // Show info UIs when music starts
   }
