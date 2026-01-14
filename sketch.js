@@ -116,7 +116,7 @@ gyroInfoUI.id = 'gyro-info-ui';
 gyroInfoUI.style.position = 'fixed';
 gyroInfoUI.style.left = '10px';
 gyroInfoUI.style.top = '10px';
-gyroInfoUI.style.zIndex = 30000;
+gyroInfoUI.style.zIndex = 10;
 gyroInfoUI.style.color = 'white';
 gyroInfoUI.innerText = '00.00';
 document.body.appendChild(gyroInfoUI);
@@ -126,7 +126,7 @@ deltaInfoUI.id = 'delta-info-ui';
 deltaInfoUI.style.position = 'fixed';
 deltaInfoUI.style.right = '10px';
 deltaInfoUI.style.top = '10px';
-deltaInfoUI.style.zIndex = 30000;
+deltaInfoUI.style.zIndex = 10;
 deltaInfoUI.style.color = 'white';
 deltaInfoUI.innerText = '00.00';
 document.body.appendChild(deltaInfoUI);
@@ -136,7 +136,7 @@ idUI.id = 'id-ui';
 idUI.style.position = 'fixed';
 idUI.style.bottom = '10px';
 idUI.style.right = '10px';
-idUI.style.zIndex = 30000;
+idUI.style.zIndex = 10;
 idUI.style.color = 'white';
 idUI.innerText = '000@EKEZIA00';
 document.body.appendChild(idUI);
@@ -151,7 +151,7 @@ ui.style.display = 'flex';
 ui.style.flexDirection = 'column';
 ui.style.justifyContent = 'center';
 ui.style.alignItems = 'center';
-ui.style.zIndex = 30000;
+ui.style.zIndex = 99;
 ui.style.top = 0;
 ui.style.color = 'white';
 ui.style.pointerEvents = 'auto'; // panel itself is interactive
@@ -186,20 +186,16 @@ ui.innerHTML = !isMobile
 
 document.body.appendChild(ui);
 
+const rn = document.createElement('div');
+
 function hideUiPanel() {
   if (ui) {
     ui.style.backdropFilter = 'blur(0px)';
     ui.style.opacity = '0';
-    loadingDiv.style.opacity = '0';
     ui.style.pointerEvents = 'none';
   }
 
-  setTimeout(() => {
-    if (roomCodePanel) {
-      ui.style.display = 'none';
-      loadingDiv.style.display = 'none';
-    }
-  }, 700);
+  // Keep `ui` in the DOM and rely on opacity/pointerEvents only.
 }
 
 // create visible digit spans
@@ -239,9 +235,12 @@ loadingDiv.style.display = 'flex';
 loadingDiv.style.alignItems = 'center';
 loadingDiv.style.justifyContent = 'center';
 loadingDiv.style.fontSize = '6rem';
-loadingDiv.style.zIndex = '999';
+loadingDiv.style.zIndex = 10001;
 loadingDiv.style.backdropFilter = 'blur(16px)';
-loadingDiv.style.filter = 'blur(4px)';
+loadingDiv.style.opacity = 1;
+loadingDiv.style.pointerEvents = 'none';
+loadingDiv.style.transition =
+  'backdrop-filter 0.7s cubic-bezier(.4,0,.2,1), background 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s cubic-bezier(.4,0,.2,1)';
 
 // container for rotating texts (so other overlays can be independent)
 const loadingTexts = document.createElement('div');
@@ -250,44 +249,77 @@ loadingTexts.style.pointerEvents = 'none';
 loadingTexts.style.textAlign = 'center';
 loadingTexts.style.fontSize = '6rem';
 loadingTexts.textContent = 'MACHINE #4';
+loadingTexts.style.filter = 'blur(4px)';
+loadingTexts.style.color = 'white';
+loadingTexts.style.opacity = '1';
 loadingDiv.appendChild(loadingTexts);
+// Blinking text — start immediately so desktop shows it
+loadingTexts.style.color = 'white';
+loadingTexts.style.opacity = '1';
+loadingTexts.style.zIndex = '10002';
+const blinkTexts = [
+  { text: 'MACHINE #4', fontSize: '12rem' },
+  { text: 'DAVID BORING', fontSize: '12rem' },
+];
+let textCount = 0;
+const textInterval = setInterval(() => {
+  textCount++;
+  const entry = blinkTexts[textCount % blinkTexts.length];
+  console.debug('loading-text blink', textCount, entry);
+  const td = document.getElementById('loading-texts');
+  if (td) td.textContent = entry.text;
+  if (td) td.style.fontSize = entry.fontSize;
+}, 500);
 
 // on mobile, show a small hint at the bottom of the loading overlay
 document.body.appendChild(loadingDiv);
 
 // If mobile and not rotated, show the rotate notice immediately so it's
 // visible alongside the loading texts from the start.
-if (isMobile && !isDeviceRotated()) {
-  if (!document.getElementById('rotate-notice')) {
-    const rn = document.createElement('div');
-    rn.id = 'rotate-notice';
-    rn.style.position = 'fixed';
-    rn.style.left = '50%';
-    rn.style.bottom = '20%';
-    rn.style.transform = 'translateX(-50%)';
-    rn.style.padding = '12px 18px';
-    rn.style.background = 'rgba(0,0,0,0.6)';
-    rn.style.color = 'white';
-    rn.style.borderRadius = '8px';
-    rn.style.zIndex = 40000;
-    rn.style.fontSize = '2.5rem';
-    rn.style.textAlign = 'center';
-    rn.textContent = 'Please rotate your device to landscape to continue.';
-    rn.style.opacity = '1';
-    rn.style.transition = 'opacity 0.3s ease';
-    loadingDiv.appendChild(rn);
-  }
+if (isMobile) {
+  rn.id = 'rotate-notice';
+  rn.style.position = 'fixed';
+  rn.style.left = '50%';
+  rn.style.bottom = '20%';
+  rn.style.transform = 'translateX(-50%)';
+  rn.style.padding = '12px 18px';
+  rn.style.background = 'rgba(0,0,0,0.6)';
+  rn.style.color = 'white';
+  rn.style.borderRadius = '8px';
+  rn.style.zIndex = 10001;
+  rn.style.fontSize = '2.5rem';
+  rn.style.textAlign = 'center';
+  rn.textContent = 'Please rotate your device to landscape to continue.';
+  rn.style.opacity = '0.2';
+  rn.style.transition = 'opacity 0.3s ease';
+  loadingDiv.appendChild(rn);
 }
 
 // shared rotation handler to toggle visibility of rotate notices
 function handleRotationChange() {
   const rotated = isDeviceRotated();
+  const rnEl = document.getElementById('rotate-notice');
 
-  if (loadingDiv) loadingDiv.style.opacity = rotated ? '0' : '1';
-  // If we've become rotated to landscape and audio+map ready, proceed to remove loading overlay
-  if (rotated && audioReady && mapReady) {
-    tryStartExperience();
+  if (!rotated) {
+    // Portrait: always show loading overlay (opacity) and hide main UI
+    if (loadingDiv) loadingDiv.style.opacity = '1';
+    if (ui) {
+      ui.style.opacity = '0';
+      ui.style.pointerEvents = 'none';
+    }
+    if (rnEl) rnEl.style.opacity = audioReady && mapReady ? '1' : '0';
+    return;
   }
+
+  // Landscape: hide loading overlay (fade) and adjust UI
+  if (loadingDiv) loadingDiv.style.opacity = '0';
+  if (rnEl) rnEl.style.opacity = '0';
+  if (ui) {
+    ui.style.opacity = audioReady && mapReady && !isAutopilot ? '1' : '0';
+    ui.style.pointerEvents = audioReady && mapReady ? 'auto' : 'none';
+  }
+
+  if (audioReady && mapReady) tryStartExperience();
 }
 
 if (isMobile) {
@@ -315,7 +347,7 @@ if (isMobile) {
     fsBtn.style.left = '50%';
     fsBtn.style.transform = 'translateX(-50%)';
     fsBtn.style.top = '10px';
-    fsBtn.style.zIndex = '50000';
+    fsBtn.style.zIndex = '999';
     fsBtn.style.width = '46px';
     fsBtn.style.height = '46px';
     fsBtn.style.borderRadius = '24px';
@@ -486,7 +518,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   viewer.scene.globe.maximumScreenSpaceError = 4.0; // coarser detail = faster
 
-  loadAudio('/audio.wav').then(() => {
+  loadAudio('/public/audio.wav').then(() => {
     setTimeout(() => {
       tryStartExperience();
     }, 1000);
@@ -494,59 +526,44 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function checkAllReady() {
-  if (!(audioReady && mapReady && roomReady)) return;
+  if (!(audioReady && mapReady)) return;
 
+  if (isMobile) if (rn) rn.style.opacity = '1';
+
+  ui.style.opacity = 1;
   // use shared isDeviceRotated() helper above
 
   // show a small rotate prompt on mobile when not rotated
   if (isMobile && !isDeviceRotated()) {
-    ui.style.opacity = 0;
-    if (!document.getElementById('rotate-notice')) {
-      const rn = document.createElement('div');
-      rn.id = 'rotate-notice';
-      rn.style.position = 'fixed';
-      rn.style.left = '50%';
-      rn.style.top = '40%';
-      rn.style.transform = 'translateX(-50%)';
-      rn.style.padding = '12px 18px';
-      rn.style.background = 'rgba(0,0,0,0.6)';
-      rn.style.color = 'white';
-      rn.style.borderRadius = '8px';
-      rn.style.zIndex = 40000;
-      rn.style.fontSize = '1.1rem';
-      rn.style.textAlign = 'center';
-      rn.textContent = 'Please rotate your device to landscape to continue.';
-      rn.style.opacity = '1';
-      rn.style.transition = 'opacity 0.3s ease';
-      document.body.appendChild(rn);
-    }
-
+    // ensure loading overlay stays visible and main UI stays hidden in portrait
+    if (loadingDiv) loadingDiv.style.opacity = '1';
     // ensure rotation handler updates UI immediately
     if (typeof handleRotationChange === 'function') handleRotationChange();
     return;
   }
 
-  // Desktop or mobile rotated: show UI
-  if (!isAutopilot) ui.style.opacity = 1; // todo: consider better check to make sure ui didnt reappear when user rotates back from portrait to landscape
+  // Desktop or mobile rotated to landscape: show UI (opacity-only)
+  if (!isAutopilot && ui) {
+    ui.style.pointerEvents = 'auto';
+    ui.style.opacity = '1';
+  }
 }
 
 function tryStartExperience() {
   if (audioReady && mapReady) {
-    const loadingDiv = document.getElementById('audio-loading');
-    if (loadingDiv) {
-      // On mobile, only remove loading overlay when device is rotated to landscape
-      if (isMobile && !isDeviceRotated()) {
-        loadingDiv.style.opacity = '1';
-      } else {
-        loadingDiv.style.transition = 'opacity 0.7s cubic-bezier(.4,0,.2,1)';
+    setInfoUIVisibility(true); // Show info UIs when music starts
+
+    // Only remove the loading overlay when not on mobile portrait
+    if (isDeviceRotated()) {
+      if (loadingDiv) {
         loadingDiv.style.opacity = '0';
-        setTimeout(() => {
-          const d = document.getElementById('audio-loading');
-          if (d && d.parentNode) d.parentNode.removeChild(d);
-        }, 700);
+      }
+    } else {
+      // keep loading overlay visible in portrait
+      if (loadingDiv) {
+        loadingDiv.style.opacity = '1';
       }
     }
-    setInfoUIVisibility(true); // Show info UIs when music starts
   }
 }
 
@@ -1502,12 +1519,6 @@ document.addEventListener('restart-clicked', function () {
 const guestBtn = document.getElementById('gc-connect');
 guestBtn.addEventListener('click', async (e) => {
   e.preventDefault();
-  // Try to lock orientation to landscape as part of this user gesture
-  try {
-    await lockLandscape();
-  } catch (err) {
-    console.warn('lockLandscape threw', err);
-  }
 
   shadowMovementEnabled = true;
   isAutopilot = true;
@@ -1530,6 +1541,7 @@ guestBtn.addEventListener('click', async (e) => {
       isPaused = false;
       audioEnded = false;
       document.dispatchEvent(new CustomEvent('play-clicked'));
+      loadingDiv.style.opacity = isDeviceRotated() ? '0' : '1';
       // cleanup listeners
       window.removeEventListener('orientationchange', onOrientationChange);
       window.removeEventListener('resize', onOrientationChange);
@@ -1625,25 +1637,3 @@ document.addEventListener('keydown', (e) => {
 });
 
 // --- BLINKING ---
-// Text animation
-const texts = [
-  { text: 'MACHINE #4', fontSize: '12rem' },
-  { text: 'DAVID BORING', fontSize: '12rem' },
-];
-let textInterval;
-let textCount = 0;
-textInterval = setInterval(() => {
-  textCount++;
-  if (loadingDiv) {
-    const entry = texts[textCount % texts.length];
-    if (typeof entry === 'string') {
-      const td = document.getElementById('loading-texts');
-      if (td) td.textContent = entry;
-      if (td) td.style.fontSize = '12rem';
-    } else {
-      const td = document.getElementById('loading-texts');
-      if (td) td.textContent = entry.text;
-      if (td) td.style.fontSize = entry.fontSize;
-    }
-  }
-}, 500);
